@@ -1,0 +1,56 @@
+flowchart TB
+    A["Capture Worker<br/>tab capture / file upload / API client"] --> B["clip_ingest_queue"]
+    B --> C["Ingestion Worker<br/>normalize clip + split media"]
+    C --> D["quality_gate_queue"]
+    D --> E["Quality Gate Worker"]
+
+    E -->|reject| F["result_queue<br/>abstain / retry required"]
+    E -->|accept| G["fanout_router"]
+
+    G --> H1["visual_queue"]
+    G --> H2["audio_queue"]
+    G --> H3["linguistic_queue"]
+    G --> H4["physio_queue"]
+    G --> H5["cbca_queue"]
+
+    H1 --> I1["Visual Worker<br/>face, pose, AU, gaze"]
+    H2 --> I2["Audio Worker<br/>ASR, prosody, tremor"]
+    H3 --> I3["Linguistic Worker<br/>spaCy, sentiment, contradiction"]
+    H4 --> I4["Physio Worker<br/>rPPG / ROI divergence"]
+    H5 --> I5["CBCA Worker<br/>reality monitoring cues"]
+
+    I1 --> J["cueevent_queue"]
+    I2 --> J
+    I3 --> J
+    I4 --> J
+    I5 --> J
+
+    J --> K["Calibration Worker<br/>baseline normalization"]
+    K --> L["scored_cue_queue"]
+    L --> M["Fusion Worker<br/>LLR accumulation + convergence gate"]
+    M --> N["narrative_queue"]
+    N --> O["Narrative / Report Worker"]
+    O --> P["result_queue"]
+    P --> Q["Delivery Worker<br/>API response + UI update + audit write"]
+
+    I1 -. error .-> R["retry_queue"]
+    I2 -. error .-> R
+    I3 -. error .-> R
+    I4 -. error .-> R
+    I5 -. error .-> R
+    C -. error .-> R
+    E -. error .-> R
+    K -. error .-> R
+    M -. error .-> R
+    O -. error .-> R
+
+    R --> S["dead_letter_queue<br/>after max retries"]
+
+    classDef queue fill:#efe3ff,stroke:#7550a6,color:#111;
+    classDef worker fill:#e4f0ff,stroke:#356aa0,color:#111;
+    classDef result fill:#e5f7e5,stroke:#3d7a3d,color:#111;
+    classDef error fill:#ffe5e5,stroke:#b55252,color:#111;
+
+    class B,D,H1,H2,H3,H4,H5,J,L,N,P,R,S queue;
+    class A,C,E,G,I1,I2,I3,I4,I5,K,M,O,Q worker;
+    class F result;

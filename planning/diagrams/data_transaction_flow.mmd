@@ -1,0 +1,49 @@
+flowchart LR
+    U["User / Analyst"] --> A["App Adapter<br/>Chrome Extension | CLI | API"]
+    A --> B["Consent + Use Case + Jurisdiction Gate"]
+    B --> C["Session Manager"]
+
+    C --> D["Baseline Capture<br/>90-180s neutral sample"]
+    D --> E["Baseline Profile Store"]
+
+    C --> F["Question + Response Clip<br/>15-30s continuous clip"]
+    F --> G["Ingestion + Normalization<br/>video/audio split + timestamps"]
+    G --> H["Quality Gate"]
+
+    H -->|fail| I["Abstain / Retry Result"]
+    H -->|pass| J["Feature Extraction Fan-out"]
+
+    J --> K1["Visual Extractor"]
+    J --> K2["Audio Extractor"]
+    J --> K3["Linguistic Extractor"]
+    J --> K4["Physiological rPPG Extractor"]
+    J --> K5["CBCA / RM Extractor"]
+
+    K1 --> L["CueEvent Stream"]
+    K2 --> L
+    K3 --> L
+    K4 --> L
+    K5 --> L
+
+    E --> M["Baseline Calibration<br/>robust z-score + shrinkage"]
+    L --> M
+
+    M --> N["Cue Scoring<br/>LLR + reliability + phase weighting"]
+    N --> O["Bayesian Fusion + Convergence Gate"]
+    O --> P["Risk Score + Uncertainty + Top Cues"]
+    P --> Q["Narrative Builder<br/>structured cue packet + explanation layer"]
+    Q --> R["Final Result<br/>score + uncertainty + narrative + compliance"]
+
+    R --> S["UI / API Response"]
+    R --> T["Audit Log + Session Report"]
+    I --> S
+
+    classDef store fill:#f7f0d6,stroke:#8a6d1f,color:#222;
+    classDef process fill:#dfefff,stroke:#3b6ea8,color:#111;
+    classDef output fill:#e7f7e7,stroke:#3d7a3d,color:#111;
+    classDef danger fill:#ffe5e5,stroke:#b55252,color:#111;
+
+    class E,T store;
+    class A,B,C,D,F,G,H,J,K1,K2,K3,K4,K5,L,M,N,O,Q process;
+    class R,S,P output;
+    class I danger;
