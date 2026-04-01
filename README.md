@@ -22,6 +22,23 @@ Blitz Engine is a modular, research-driven engine that analyzes video to detect 
 
 ---
 
+## 📚 Planning Phase Documentation
+
+All planning artifacts consolidated in [`planning/`](planning/) folder:
+
+| Document | Purpose |
+|---|---|
+| **[planning/INDEX.md](planning/INDEX.md)** | Start here — overview of all planning documents and quick navigation |
+| **[planning/BLITZ_ENGINE_SPEC.md](planning/BLITZ_ENGINE_SPEC.md)** | Complete technical specification (30KB) — all 5 layers, 66 cues, APIs, output schema |
+| **[planning/LIE_DETECTOR_BLUEPRINT.md](planning/LIE_DETECTOR_BLUEPRINT.md)** | Project blueprint (31KB) — vision, constraints, tech stack, library verification |
+| **[planning/ACCURACY_PLAN.md](planning/ACCURACY_PLAN.md)** | Accuracy strategy (14KB) — quality gates, baseline normalization, scoring formula |
+| **[planning/RESEARCH.md](planning/RESEARCH.md)** | Implementation research (14KB) — 6 gaps resolved, 2 blockers, library install methods |
+| **[planning/signal_preview.py](planning/signal_preview.py)** | VHS signal UI demo — run with `python planning/signal_preview.py` |
+
+**Total:** ~93 KB planning documentation. Ready for Phase 1 implementation.
+
+---
+
 ## Accuracy (Honest)
 
 | System | Accuracy |
@@ -54,7 +71,7 @@ The 85-99% numbers in papers are lab overfitting on tiny datasets (121-320 clips
 └─────────────────────────────────────────────────────────────┘
 ```
 
-Full specification: [docs/BLITZ_ENGINE_SPEC.md](docs/BLITZ_ENGINE_SPEC.md)
+Full specification: [planning/BLITZ_ENGINE_SPEC.md](planning/BLITZ_ENGINE_SPEC.md)
 
 ---
 
