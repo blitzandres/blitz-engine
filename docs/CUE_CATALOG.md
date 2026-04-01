@@ -1,6 +1,6 @@
 # Video Lie Detector — Project Blueprint
 > v2.1 — Cue catalog and research reference, March 2026
-> **ARCHITECTURE SUPERSEDED** → See `BLITZ_ENGINE_SPEC.md` for full Blitz Engine architecture, fusion math, calibration protocol, and GitHub repo structure.
+> **ARCHITECTURE SUPERSEDED** → See `BLITZ_ENGINE_SPEC.md` for architecture and `../planning/PROJECT_MAP.md` for repo structure, current status, and implementation order.
 
 ---
 
@@ -232,18 +232,18 @@ DECEPTION → ████░░░░░░░░░░░░  (red, jagged)
 
 ```
 PHASE 1 — Core Engine (software only)
-→ Video URL or file input
-→ 40 cues detected (visual + audio + linguistic + rPPG)
+→ Local file / CLI / API input first
+→ Highest-confidence subset of the 66-cue catalog implemented first
 → VHS signal bars
 → Claude API narration + structured scoring
-→ Final verdict with %
-→ Hosted on Railway ($5/month Hobby plan)
+→ Final probability + uncertainty + abstain option
+→ Localhost FastAPI / CLI first (zero-cost research target)
 
 PHASE 2 — Chrome Extension
 → Auto detects face in any video (YouTube, Zoom, etc.)
 → Widget appears on manual activation
 → Captures continuous video clips (NOT sparse frames — see architecture)
-→ Same Phase 1 engine underneath
+→ Sends clips to the same local-first engine underneath
 
 PHASE 3 — Hardware Add-ons
 → Thermal IR camera support (3 additional cues)
@@ -262,8 +262,8 @@ Facial action units     → OpenGraphAU (41 AUs, Apache 2.0 ✅) — covers micr
 Blink detection         → MediaPipe Face Mesh + EAR algorithm (Apache 2.0 ✅)
 
 AUDIO LAYER
-Transcription + fillers → CrisperWhisper (Apache 2.0 ✅) — replaces base Whisper
-                          Gets fillers (um/uh), verbatim + word timestamps in one pass
+Transcription + fillers → CrisperWhisper (CC-BY-NC-4.0 ✅ for non-commercial research)
+                          WhisperX (BSD-2 fallback if project scope changes)
 Pitch + energy          → librosa (ISC license ✅)
 Jitter/shimmer/tremor   → Parselmouth = Praat in Python (GPL v3 — ok for SaaS backend)
 Heart rate + HRV        → vitallens-python (MIT ✅, CPU-only classical methods)
@@ -278,7 +278,7 @@ Holistic analysis       → Claude API (CBCA, RM scoring, cross-answer consisten
 
 INFRASTRUCTURE
 Video processing        → OpenCV
-Backend hosting         → Railway ($5/month Hobby — 8GB RAM required)
+Backend hosting         → Localhost first, Oracle Cloud Always Free / HF Spaces optional
 Code storage            → GitHub
 Extension               → Chrome Extension (Phase 2)
 ```
@@ -297,9 +297,10 @@ CORRECTED ARCHITECTURE:
 Chrome Extension captures:
 → Short continuous video clip (15–30 seconds at 15–30fps)
 → NOT sparse frames
-→ Send as base64-encoded video chunk to Railway backend
+→ Send as base64-encoded video chunk to local FastAPI backend
+  (or a configured free remote endpoint if needed)
 
-Railway backend processes:
+Backend processes:
 → Frame extraction via OpenCV
 → Face/body detection (InsightFace + MMPose + OpenGraphAU)
 → Audio extraction → CrisperWhisper + librosa + Parselmouth
@@ -584,14 +585,14 @@ Cross-domain accuracy drops 50% from those numbers.
 ## Cost Estimates
 
 ```
-2 min video    →  ~$0.08 (Claude API)
-10 min video   →  ~$0.35
-30 min video   →  ~$1.00
-1 hour video   →  ~$2.00
+2 min video           →  ~$0.08 (Claude API)
+10 min video          →  ~$0.35
+30 min video          →  ~$1.00
+1 hour video          →  ~$2.00
 
-Railway hosting → $5/month (Hobby plan, required)
-Personal use (1 video/day) → ~$7-8/month total
-Heavy use (10 videos/day) → ~$105/month total
+Hosting target        →  $0 (localhost / local GPU or CPU)
+Optional remote path  →  Free tiers first (Oracle Cloud / HF Spaces)
+Main paid cost today  →  API usage, not infrastructure
 ```
 
 ---

@@ -1,5 +1,5 @@
 # Lie Detector — Implementation Research
-> Completed March 30, 2026 — pre-coding gap analysis
+> Completed March 30, 2026 | Consolidation update April 1, 2026
 
 ---
 
@@ -7,13 +7,15 @@
 
 All 6 implementation gaps resolved. **2 blockers discovered** that require decisions before coding.
 
+Localhost remains the active deployment target for research use. Any Railway notes below are retained only as optional archival reference so the research context is not lost.
+
 ---
 
 ## BLOCKER 1: CrisperWhisper License is Non-Commercial
 
 **CrisperWhisper is CC-BY-NC-4.0 — non-commercial use only.**
 
-This conflicts with a commercial SaaS business model. Options:
+This would conflict with a future commercial SaaS business model. Options:
 - **Option A (easy):** Use WhisperX (BSD-2) instead — word timestamps + pause gaps, no filler detection
 - **Option B (preferred if commercial):** Contact Nyra Health for a commercial license
 - **Option C (acceptable for Phase 1 personal use):** Use CrisperWhisper now, replace before monetizing
@@ -45,7 +47,7 @@ huggingface-cli login   # must accept CC-BY-NC-4.0 license on HF page first
 
 **Key facts:**
 - Only ONE model size: large-v3 equivalent (~1.55B params)
-- RAM on CPU: ~6-7 GB (tight on Railway 8 GB — use batch_size=1)
+- RAM on CPU: ~6-7 GB (tight on 8 GB-class CPU boxes — use `batch_size=1`)
 - Filler tokens output: `[UH]` and `[UM]` in transcript
 - `utils.py` is NOT a package — must be on sys.path at runtime (copy into your project)
 - Custom transformers fork is MANDATORY for correct word timestamps
@@ -272,9 +274,13 @@ def center_of_mass(kpts):  # kpts shape (133, 2)
 
 ---
 
-## Gap 5: Railway Deploy Config
+## Gap 5: Optional Deployment Reference (Local-first plan)
 
-**Plan:** Hobby ($5/month) = 8 GB RAM, 8 vCPU — correct tier
+**Active plan:** Run the backend locally first for research use.
+
+**Optional free remote fallback:** Oracle Cloud Always Free or Hugging Face Spaces CPU.
+
+**Archived paid reference:** Railway Hobby notes are preserved below in case the project scope changes later.
 
 **Build approach: custom Dockerfile** (nixpacks is deprecated as of March 2026; railpack doesn't handle ML sys deps reliably)
 
@@ -309,12 +315,12 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 ```
 
-**Model weights strategy:** Download to Railway Volume (persists across restarts)
+**Model weights strategy for a managed host:** Download to a persistent volume instead of baking weights into the image
 1. Dashboard → Service → Volumes → Add Volume, mount at `/app/models`
 2. In FastAPI lifespan: check if weights exist before downloading
 3. Never bake weights into Docker image (makes image 2-10 GB)
 
-**Secrets:** Dashboard → Service → Variables tab → add `CLAUDE_API_KEY`, `HF_TOKEN`, etc.
+**Secrets:** Use env vars such as `CLAUDE_API_KEY`, `HF_TOKEN`, etc.
 
 **Cold start mitigation:**
 - `healthcheckTimeout = 300` (5 min) — models take time to load
@@ -333,7 +339,8 @@ User clicks extension icon
 → background.js (service worker): gets stream ID via tabCapture
 → sends stream ID to offscreen document via chrome.runtime.sendMessage()
 → offscreen.js: getUserMedia({chromeMediaSource: 'tab'}) → MediaRecorder
-→ records 15s → onstop fires → base64 encode → POST to Railway → start next clip
+→ records 15s → onstop fires → base64 encode → POST to local FastAPI endpoint
+  (or configured remote endpoint) → start next clip
 ```
 
 **`manifest.json` permissions:**
@@ -425,4 +432,4 @@ pip install fastapi uvicorn anthropic
 
 ---
 
-*Research complete — ready to begin Phase 1 (linguistic module)*
+*Research complete — ready to begin Phase 1 (linguistic module) from the consolidated repo plan*

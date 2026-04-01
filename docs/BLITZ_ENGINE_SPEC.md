@@ -543,6 +543,14 @@ Based on Codex research of DARE, DOLOS winners, SVC 2025:
 ```
 blitz-engine/
 │
+├── planning/                      # Canonical research bundle and execution map
+│   ├── INDEX.md
+│   ├── PROJECT_MAP.md
+│   ├── BLITZ_ENGINE_SPEC.md
+│   ├── ACCURACY_PLAN.md
+│   ├── RESEARCH.md
+│   └── LIE_DETECTOR_BLUEPRINT.md
+│
 ├── core/                          # The engine itself — no app-specific code
 │   ├── schemas/                   # CueEvent, Session, BlitzOutput schemas
 │   ├── calibration/               # Personal baseline + robust Z + drift correction
@@ -575,12 +583,10 @@ blitz-engine/
 │   ├── PROHIBITED_USES.md         # Hiring, law enforcement, healthcare, EU high-risk
 │   └── ETHICS.md                  # Full ethical framework + EU AI Act considerations
 │
-└── docs/                          # Documentation
+└── docs/                          # Public-facing documentation
     ├── QUICKSTART.md
-    ├── architecture.md
-    ├── cue_catalog.md             # All 66 cues, effect sizes, implementation status
-    ├── calibration_guide.md
-    └── contributing.md
+    ├── BLITZ_ENGINE_SPEC.md
+    └── CUE_CATALOG.md             # All 66 cues, effect sizes, implementation status
 ```
 
 ### Public API (Python SDK)
@@ -697,9 +703,9 @@ The published 85-99% numbers are lab overfitting. Datasets are tiny (121-320 cli
 ### Phase 0 — Foundation (current)
 - Complete blueprint research ✅
 - Write Blitz Engine spec ✅
-- Set up GitHub repo
-- Finalize cue catalog with effect sizes
-- Write governance docs
+- GitHub repo initialized + planning consolidated ✅
+- Finalize cue catalog with effect sizes ✅
+- Governance docs written ✅
 
 ### Phase 1 — Core Engine
 - Build Layer 1 (ingestion + quality screening)
@@ -746,4 +752,4 @@ The published 85-99% numbers are lab overfitting. Datasets are tiny (121-320 cli
 
 *Blitz Engine Spec v1.0 — Research by Codex (o3/gpt-5.3-codex)*
 *Literature: DePaulo 2003, Bond & DePaulo 2006, Bogaard et al. 2024, DOLOS 2023, SVC 2025, EU AI Act 2024/1689*
-*Status: Planning complete. Ready to initialize GitHub repo and begin Phase 1.*
+*Status: Planning complete. Repo initialized. Ready for Phase 1 implementation sequencing.*

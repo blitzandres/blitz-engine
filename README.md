@@ -28,6 +28,7 @@ All planning artifacts consolidated in [`planning/`](planning/) folder:
 
 | Document | Purpose |
 |---|---|
+| **[planning/PROJECT_MAP.md](planning/PROJECT_MAP.md)** | Canonical project map — repo reality, source-of-truth rules, implementation order |
 | **[planning/INDEX.md](planning/INDEX.md)** | Start here — overview of all planning documents and quick navigation |
 | **[planning/BLITZ_ENGINE_SPEC.md](planning/BLITZ_ENGINE_SPEC.md)** | Complete technical specification (30KB) — all 5 layers, 66 cues, APIs, output schema |
 | **[planning/LIE_DETECTOR_BLUEPRINT.md](planning/LIE_DETECTOR_BLUEPRINT.md)** | Project blueprint (31KB) — vision, constraints, tech stack, library verification |
@@ -35,7 +36,9 @@ All planning artifacts consolidated in [`planning/`](planning/) folder:
 | **[planning/RESEARCH.md](planning/RESEARCH.md)** | Implementation research (14KB) — 6 gaps resolved, 2 blockers, library install methods |
 | **[planning/signal_preview.py](planning/signal_preview.py)** | VHS signal UI demo — run with `python planning/signal_preview.py` |
 
-**Total:** ~93 KB planning documentation. Ready for Phase 1 implementation.
+`planning/` is the canonical research source tracked in Git. If you keep external mirror copies, sync them from here.
+
+**Total:** ~100 KB planning documentation. Ready for Phase 1 implementation sequencing.
 
 ---
 
@@ -124,7 +127,8 @@ blitz-engine/
 ├── apps/              Adapters: chrome-extension, web-api, cli
 ├── evaluation/        Benchmarks, fairness audits, baselines
 ├── governance/        Ethics, intended use, prohibited uses, model card
-└── docs/              Architecture spec, cue catalog, guides
+├── docs/              Architecture spec, cue catalog, guides
+└── planning/          Canonical research bundle and implementation map
 ```
 
 ---
@@ -146,7 +150,7 @@ EU AI Act (Regulation 2024/1689) applies. Do not deploy for high-risk uses in EU
 
 ## Status
 
-- [x] Phase 0 — Research complete, 66 cues documented, architecture specified
+- [x] Phase 0 — Research complete, planning consolidated, repo initialized
 - [ ] Phase 1 — Core engine (all 5 layers + modality plugins + CLI)
 - [ ] Phase 2 — Applications (FastAPI, Python SDK, Chrome Extension)
 - [ ] Phase 3 — Validation (benchmark + fairness audit + model card)

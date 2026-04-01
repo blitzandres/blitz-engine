@@ -1,5 +1,5 @@
 # Blitz Engine — Complete Project Documentation
-> Consolidated April 1, 2026 | All planning phase artifacts in one place
+> Consolidated April 1, 2026 | Canonical planning set tracked in the repo
 
 ---
 
@@ -7,33 +7,36 @@
 
 This folder contains the complete planning phase for the **Blitz Engine** — a modular, open-source behavioral deception detection system.
 
+Treat this folder as the authoritative planning copy. External mirrors should be synced from here, not edited independently.
+
 ### Files Included
 
 | File | Purpose | Size | Status |
 |------|---------|------|--------|
+| **PROJECT_MAP.md** | Canonical map of the repo, source-of-truth rules, implementation order, and current build status | 8KB | ✅ Final |
 | **BLITZ_ENGINE_SPEC.md** | Complete technical specification with 5-layer architecture, 66 cues, Bayesian fusion, output schema | 30KB | ✅ Final |
 | **LIE_DETECTOR_BLUEPRINT.md** | High-level project blueprint with vision, cue catalog (40→66), libraries, constraints, build phases | 31KB | ✅ Final |
 | **ACCURACY_PLAN.md** | Accuracy expectations, quality gates, baseline normalization, scoring formula, Claude prompt strategy | 14KB | ✅ Final |
 | **RESEARCH.md** | Implementation research: 6 gaps resolved, 2 blockers identified, library install methods | 14KB | ✅ Final |
 | **signal_preview.py** | VHS signal monitor preview (terminal animation demo) | 4.1KB | ✅ Runnable |
 
-**Total:** ~93 KB of documentation, research, and code scaffolding
+**Total:** ~100 KB of documentation, research, and code scaffolding
 
 ---
 
 ## 🎯 Quick Start — Read in This Order
 
-1. **BLITZ_ENGINE_SPEC.md** — Start here to understand the complete system architecture
+1. **PROJECT_MAP.md** — Start here to understand what is real vs planned
+   - Canonical source of truth for repo structure
+   - Current implementation status by directory
+   - Recommended build sequence
+   - Rules for syncing mirror copies
+
+2. **BLITZ_ENGINE_SPEC.md** — Canonical architecture source of truth
    - 5-layer design (ingestion, feature extraction, calibration, fusion, output)
    - All 66 behavioral cues across 5 modality families
    - Personal baseline calibration + Bayesian log-odds fusion
    - Output schema + API examples
-
-2. **LIE_DETECTOR_BLUEPRINT.md** — The original vision + research updates
-   - Project constraints (100% free tools, no commercial cost)
-   - All 66 cues ranked by reliability
-   - Tech stack with verified licenses
-   - Build phases and architecture corrections
 
 3. **ACCURACY_PLAN.md** — How to achieve 70-75% accuracy
    - Quality gates per cue
@@ -46,10 +49,16 @@ This folder contains the complete planning phase for the **Blitz Engine** — a 
    - 6 implementation gaps: all resolved with specific code examples
    - 2 blockers: CrisperWhisper license, AU28 missing from OpenGraphAU
    - Library-by-library install instructions
-   - Railway deployment config
+   - Local-first deployment notes + optional remote fallback references
    - Chrome Extension MV3 architecture
 
-5. **signal_preview.py** — Run to see the VHS signal UI
+5. **LIE_DETECTOR_BLUEPRINT.md** — Historical blueprint + cue catalog
+   - Original vision and product framing
+   - Full 66-cue catalog and reliability ranking
+   - Library decisions and constraints history
+   - Use for context, not as the architecture source of truth
+
+6. **signal_preview.py** — Run to see the VHS signal UI
    ```bash
    python signal_preview.py
    ```
@@ -61,7 +70,7 @@ This folder contains the complete planning phase for the **Blitz Engine** — a 
 ```
 ┌────────────────────────────────────────────────────────────┐
 │  LAYER 1: INGESTION                                         │
-│  Chrome Extension → 15-30s continuous video clip @ 15-30fps│
+│  File / CLI / API / Extension adapters → continuous clip   │
 ├────────────────────────────────────────────────────────────┤
 │  LAYER 2: FEATURE EXTRACTION (66 Cues)                     │
 │  Visual (20) | Audio (13) | Linguistic (18) | Physio (5)   │
@@ -145,7 +154,8 @@ Unusual peripheral details, admitted perceptual uncertainty, cognitive operation
 - **FastAPI** (MIT) — REST API wrapper
 - **Claude API** (Anthropic) — Structured scoring + narration
 - **Python 3.11+** — Runtime
-- **Railway** ($5/month Hobby) — Hosting (8GB RAM, 8 vCPU)
+- **Localhost first** — Zero-cost research target
+- **Oracle Cloud / HF Spaces** — Optional free remote fallback
 
 ---
 
@@ -248,6 +258,7 @@ This shows:
 
 ## ✅ What's Complete
 
+- [x] Canonical planning map (PROJECT_MAP.md)
 - [x] Full technical specification (BLITZ_ENGINE_SPEC.md)
 - [x] Project blueprint with 66 cues (LIE_DETECTOR_BLUEPRINT.md)
 - [x] Accuracy planning + scoring formula (ACCURACY_PLAN.md)
@@ -256,14 +267,16 @@ This shows:
 - [x] Architecture validation
 - [x] Ethical framework (Apache 2.0 + prohibited uses)
 - [x] VHS signal UI preview (signal_preview.py)
+- [x] GitHub repo initialized + planning folder tracked
+- [x] Governance docs present in `governance/`
 
 ## ⏭️ Next Steps
 
-1. **Finalize GitHub repo structure** — Use the `blitz-engine/` layout from BLITZ_ENGINE_SPEC.md
-2. **Start Phase 1, Task 1** — Implement linguistic module (spaCy + VADER + NRCLex)
-3. **Add governance docs** — MODEL_CARD.md, INTENDED_USE.md, ETHICS.md
-4. **Create test harness** — Unit tests for each modality module
-5. **Begin audio module** — librosa + Parselmouth + CrisperWhisper
+1. **Keep `planning/` canonical** — Update repo docs first, then sync any external mirrors
+2. **Start Phase 1, Task 1** — Implement linguistic module (`modalities/linguistic/`)
+3. **Build local-first API/CLI scaffolding** — `apps/web-api/` + `apps/cli/`
+4. **Create test harness** — Unit tests and dataset fixtures for each modality module
+5. **Begin audio module** — librosa + Parselmouth + CrisperWhisper/WhisperX fallback
 
 ---
 
@@ -278,5 +291,5 @@ Refer to:
 
 ---
 
-*Consolidated from realwealth-portfolio lie detector planning phase — April 1, 2026*
-*Ready for Phase 1 implementation*
+*Consolidated from earlier lie detector planning into the tracked Blitz Engine repo — April 1, 2026*
+*Ready for Phase 1 implementation sequencing*
