@@ -1,0 +1,59 @@
+---
+title: Blitz Engine — User Session Flow
+---
+flowchart TD
+    START(["User opens Blitz Engine\n(CLI / Extension / API)"])
+
+    START --> CONSENT["Provide Consent\n+ Use Case\n+ Jurisdiction"]
+    CONSENT -->|rejected or missing| BLOCKED["Access Denied\nSession ends"]
+    CONSENT -->|approved| BASELINE
+
+    subgraph SETUP ["Phase 1 — Baseline Setup (90–180s)"]
+        BASELINE["Record neutral baseline\n'Talk naturally for 90–180 seconds'"]
+        BASELINE --> BQUALITY{"Baseline quality\nacceptable?"}
+        BQUALITY -->|no| RETRY_B["Retry baseline\n(bad audio/video)"]
+        RETRY_B --> BASELINE
+        BQUALITY -->|yes| CALIBRATED["Personal baseline stored\n(robust z-score per cue)"]
+    end
+
+    CALIBRATED --> QUESTION
+
+    subgraph ANALYSIS ["Phase 2 — Live Analysis"]
+        QUESTION["Ask question / Play clip\n(15–30s per response)"]
+        QUESTION --> CAPTURE["Capture response clip\n(video + audio)"]
+        CAPTURE --> QGATE{"Input quality\nacceptable?\n(720p+, clean audio)"}
+        QGATE -->|no| ABSTAIN["Abstain\n'Insufficient quality to score'"]
+        QGATE -->|yes| EXTRACT["Extract behavioral cues\n(66 signals across 5 modalities)"]
+        EXTRACT --> NORMALIZE["Normalize vs baseline\n(delta from your personal neutral)"]
+        NORMALIZE --> FUSE["Fuse signals\n(Bayesian log-odds + convergence gate)"]
+        FUSE --> GATE{"2+ independent\nmodality families\nconverge?"}
+        GATE -->|no| ABSTAIN
+        GATE -->|yes| SCORE["Risk score + uncertainty\n(0.0 → 1.0, abstain threshold)"]
+    end
+
+    SCORE --> OUTPUT
+
+    subgraph OUTPUT ["Phase 3 — Output"]
+        REPORT["Narrative report\n+ top contributing cues\n+ confidence interval"]
+        LOG["Audit log written\n(session, timestamp, use case)"]
+    end
+
+    SCORE --> REPORT
+    SCORE --> LOG
+    ABSTAIN --> LOG
+
+    REPORT --> NEXT{"Analyze another\nresponse?"}
+    NEXT -->|yes| QUESTION
+    NEXT -->|no| DONE(["Session complete"])
+
+    classDef phase fill:#e4f0ff,stroke:#356aa0,color:#111;
+    classDef gate fill:#fff7dc,stroke:#8a6d1f,color:#222;
+    classDef block fill:#ffe5e5,stroke:#b55252,color:#111;
+    classDef ok fill:#e7f7e7,stroke:#3d7a3d,color:#111;
+    classDef neutral fill:#f4f4f4,stroke:#888,color:#111;
+
+    class CONSENT,BASELINE,BQUALITY,CALIBRATED,QUESTION,CAPTURE phase;
+    class QGATE,GATE,FUSE,EXTRACT,NORMALIZE,SCORE gate;
+    class BLOCKED,ABSTAIN block;
+    class REPORT,DONE ok;
+    class LOG,NEXT,RETRY_B neutral;

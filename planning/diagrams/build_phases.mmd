@@ -1,0 +1,66 @@
+---
+title: Blitz Engine — Build Roadmap
+---
+flowchart LR
+    subgraph P0 ["Phase 0 ✅ DONE"]
+        P0A["Research\n66 cues catalogued"]
+        P0B["Architecture spec\nwritten"]
+        P0C["GitHub repo\ninitialized"]
+        P0D["Ethics framework\n+ governance docs"]
+        P0A --> P0B --> P0C --> P0D
+    end
+
+    subgraph P1 ["Phase 1 — Core Engine"]
+        P1A["Linguistic module\nspaCy + VADER + NRCLex"]
+        P1B["Audio module\nlibrosa + Parselmouth\n+ CrisperWhisper"]
+        P1C["Visual module\nMediaPipe + OpenGraphAU\n+ rtmlib"]
+        P1D["Physiological module\nvitallens rPPG"]
+        P1E["Bayesian fusion\n+ convergence gate"]
+        P1F["CLI adapter\n+ VHS signal UI"]
+        P1A --> P1B --> P1C --> P1D --> P1E --> P1F
+    end
+
+    subgraph P2 ["Phase 2 — Applications"]
+        P2A["FastAPI REST wrapper\nPOST /analyze"]
+        P2B["Python SDK\npip installable"]
+        P2C["Chrome Extension\nlive tab capture"]
+        P2D["Web UI\nVHS signal monitor"]
+        P2A --> P2B --> P2C --> P2D
+    end
+
+    subgraph P3 ["Phase 3 — Validation"]
+        P3A["Benchmark\nReal-Life Trial dataset"]
+        P3B["Fairness audit\nsubgroup accuracy"]
+        P3C["Model card\npublish results"]
+        P3A --> P3B --> P3C
+    end
+
+    subgraph P4 ["Phase 4 — Hardware"]
+        P4A["Thermal camera\nadapter"]
+        P4B["3 additional cues\n(physiological)"]
+        P4C["Validated accuracy\n~83–87% controlled"]
+        P4A --> P4B --> P4C
+    end
+
+    P0 --> P1 --> P2 --> P3 --> P4
+
+    subgraph TARGETS ["Accuracy Targets"]
+        T0["Human baseline\n54%"]
+        T1["Phase 1 target\n70–75%"]
+        T2["Phase 2 target\n75–80%"]
+        T3["Phase 4 ceiling\n83–87%"]
+    end
+
+    P1 -.->|"goal"| T1
+    P2 -.->|"goal"| T2
+    P4 -.->|"ceiling"| T3
+
+    classDef done fill:#e7f7e7,stroke:#3d7a3d,color:#111;
+    classDef active fill:#e4f0ff,stroke:#356aa0,color:#111;
+    classDef future fill:#f4f4f4,stroke:#888,color:#555;
+    classDef target fill:#fff7dc,stroke:#8a6d1f,color:#222;
+
+    class P0A,P0B,P0C,P0D done;
+    class P1A,P1B,P1C,P1D,P1E,P1F active;
+    class P2A,P2B,P2C,P2D,P3A,P3B,P3C,P4A,P4B,P4C future;
+    class T0,T1,T2,T3 target;

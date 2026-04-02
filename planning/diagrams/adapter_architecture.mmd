@@ -1,0 +1,67 @@
+---
+title: Blitz Engine — Application Adapters
+---
+flowchart TB
+    subgraph INPUTS ["Input Sources"]
+        CLI["CLI\n`blitz analyze video.mp4`"]
+        API["REST API\nPOST /analyze"]
+        EXT["Chrome Extension\nLive tab capture"]
+        SDK["Python SDK\nblitz.run(path)"]
+    end
+
+    subgraph GATE ["Ethics & Consent Gate"]
+        CONSENT["Validates:\n• consent flag\n• use_case field\n• jurisdiction field\n\nBlocks: hiring | law enforcement\n| healthcare | EU high-risk"]
+    end
+
+    CLI --> CONSENT
+    API --> CONSENT
+    EXT --> CONSENT
+    SDK --> CONSENT
+
+    CONSENT -->|pass| ENGINE
+
+    subgraph ENGINE ["Blitz Engine Core\n(blitz-engine/core/)"]
+        INGEST["Ingestion\n+ Quality Gate"]
+        INGEST --> FEATURES["Feature Extraction\n(5 modality plugins)"]
+        FEATURES --> CALIB["Baseline Calibration"]
+        CALIB --> FUSION["Bayesian Fusion\n+ Convergence Gate"]
+        FUSION --> OUT["BlitzOutput\nscore · uncertainty · cues · narrative"]
+    end
+
+    CONSENT -->|fail| REJECTED["Request rejected\n403 + reason"]
+
+    OUT --> DELIVERY
+
+    subgraph DELIVERY ["Output Delivery"]
+        TERMINAL["Terminal report\n(CLI / SDK)"]
+        JSON["JSON response\n(API / SDK)"]
+        WIDGET["VHS signal widget\n(Extension UI)"]
+        AUDITLOG["Audit log\n(all adapters)"]
+    end
+
+    OUT --> TERMINAL
+    OUT --> JSON
+    OUT --> WIDGET
+    OUT --> AUDITLOG
+
+    subgraph STORAGE ["Local Storage (Phase 1)"]
+        BSTORE["Baseline profiles\n(per session, per person)"]
+        ASTORE["Audit logs\n(session · timestamp · use_case)"]
+    end
+
+    CALIB <--> BSTORE
+    AUDITLOG --> ASTORE
+
+    classDef input fill:#e4f0ff,stroke:#356aa0,color:#111;
+    classDef gate fill:#fff7dc,stroke:#8a6d1f,color:#222;
+    classDef engine fill:#f0f0ff,stroke:#6655bb,color:#111;
+    classDef output fill:#e7f7e7,stroke:#3d7a3d,color:#111;
+    classDef block fill:#ffe5e5,stroke:#b55252,color:#111;
+    classDef store fill:#f7f0d6,stroke:#8a6d1f,color:#222;
+
+    class CLI,API,EXT,SDK input;
+    class CONSENT gate;
+    class INGEST,FEATURES,CALIB,FUSION,OUT engine;
+    class TERMINAL,JSON,WIDGET,AUDITLOG output;
+    class REJECTED block;
+    class BSTORE,ASTORE store;
