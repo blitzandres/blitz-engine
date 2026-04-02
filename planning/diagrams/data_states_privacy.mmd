@@ -1,0 +1,97 @@
+---
+title: Blitz Engine — Data States & Privacy Boundaries
+---
+flowchart TD
+    subgraph INPUT ["User Input"]
+        R1["CLI: local file path\n.mp4 / .mov / .wav"]
+        R2["SDK: file object\nor numpy array"]
+        R3["Chrome Extension:\nlive tab/mic chunks"]
+        R4["REST API:\nmultipart upload\nor stream URL"]
+    end
+
+    R1 & R2 & R3 & R4 --> SE
+
+    SE["SessionEnvelope\n─────────────────\nsession_id\nadapter type\nconsent flags\nretention policy\nuse_case + jurisdiction"]
+
+    SE --> NM
+
+    NM["NormalizedMedia\n─────────────────\nstandardized fps + resolution\nstandardized audio sample rate\nsegmented into clips\n\n⚠ Highest sensitivity\nRaw biometric + voice"]
+
+    NM --> FE
+
+    subgraph FE ["Feature Extraction — ALL LOCAL"]
+        VF["VisualFeatures\nAUs, landmarks,\ngaze, blink, pose"]
+        AF["AudioFeatures\npitch, jitter, shimmer,\nHNR, pause, ASR text"]
+        LF["LinguisticFeatures\ntokens, sentiment,\nhedging, contradiction"]
+        PF["PhysioFeatures\nrPPG pulse + HRV\nconfidence scores"]
+        CF["CBCA/RM Features\nstatement quality\nevidence markers"]
+    end
+
+    NM --> VF & AF & LF & PF & CF
+
+    VF & AF & LF & PF & CF --> FG
+
+    FG["FeatureGraph\n─────────────────\ntime-aligned feature vectors\nper-cue confidence scores\nmodality family labels\n\n⚠ Derived biometrics\nLower re-ID risk than raw media"]
+
+    FG --> DEL1
+    DEL1(["🗑 RawInput + NormalizedMedia\ndeleted from memory\nimmediately after extraction"])
+
+    FG --> SC
+
+    SC["ScoredCues\n─────────────────\nper-modality risk scores\ntop contributing cues\nBayesian fused score\nuncertainty estimate"]
+
+    SC --> GATE{"Convergence Gate\n2+ independent\nmodality families?"}
+    GATE -->|no| ABSTAIN["BlitzOutput: ABSTAIN\n─────────────────\nno verdict returned\nreason logged"]
+    GATE -->|yes| CP
+
+    CP["CuePacket — OUTBOUND BOUNDARY\n─────────────────────────────────\nsession_id\nrisk_score + uncertainty\nmodality_scores\ntop_cues + evidence_spans\ncaveats\n\n✅ NO raw video\n✅ NO raw audio\n✅ NO full transcript\nStructured JSON only"]
+
+    CP -->|"sent to Claude API\n(external call)"| NT
+
+    NT["NarrativeText\n─────────────────\nhuman-readable explanation\ncue-level reasoning\nconfidence framing\nbuilt-in caveats"]
+
+    SC --> FR
+    NT --> FR
+
+    FR["FinalReport — BlitzOutput\n─────────────────\nrisk_score\nuncertainty\ncue_summary\nnarrative\nconfidence interval\naudit_refs\nnot_for_sole_decision: true"]
+
+    FR --> OUT
+
+    subgraph OUT ["Delivered to User"]
+        O1["CLI / SDK\nterminal report + JSON"]
+        O2["REST API\nJSON response"]
+        O3["Chrome Extension\nVHS signal widget"]
+    end
+
+    FR --> STORE
+
+    subgraph STORE ["Persisted (policy-driven)"]
+        S1["BaselineProfile\nper-subject norms\n(optional, local)"]
+        S2["SessionRecord\nscores + cues\nmodel version\ntimestamp"]
+        S3["AuditLog\nwho + when\nadapter + config hash"]
+        S4["FeatureGraph\n(optional, explicit opt-in)"]
+    end
+
+    STORE --> DEL2
+    DEL2(["🗑 Temp files + buffers\nsecure wipe at session close\nraw media: never stored\nunless explicit opt-in"])
+
+    subgraph BOUNDARY ["Privacy Boundary Summary"]
+        B1["Local only:\nRawInput → NormalizedMedia\n→ FeatureGraph → ScoredCues"]
+        B2["Leaves device:\nCuePacket → Claude API\n(structured JSON, no media)"]
+        B3["Remote server path:\nif REST API used, raw media\ngoes to your server first,\nthen only CuePacket to Claude"]
+    end
+
+    classDef sensitive fill:#ffe5e5,stroke:#b55252,color:#111;
+    classDef derived fill:#fff7dc,stroke:#8a6d1f,color:#222;
+    classDef safe fill:#e7f7e7,stroke:#3d7a3d,color:#111;
+    classDef boundary fill:#e4f0ff,stroke:#356aa0,color:#111;
+    classDef delete fill:#f4f4f4,stroke:#888,color:#555;
+    classDef output fill:#f0f0ff,stroke:#6655bb,color:#111;
+
+    class R1,R2,R3,R4,NM sensitive;
+    class FG,SC,VF,AF,LF,PF,CF derived;
+    class CP,FR,NT safe;
+    class SE,GATE boundary;
+    class DEL1,DEL2 delete;
+    class O1,O2,O3 output;
+    class S1,S2,S3,S4 derived;

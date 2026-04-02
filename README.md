@@ -55,6 +55,140 @@ The 85-99% numbers in papers are lab overfitting on tiny datasets (121-320 clips
 
 ---
 
+## How It Works
+
+### User Session Flow
+
+From consent gate through baseline calibration, live analysis, and final report — or an explicit abstain when quality is insufficient.
+
+```mermaid
+flowchart TD
+    START(["User opens Blitz Engine\n(CLI / Extension / API)"])
+
+    START --> CONSENT["Provide Consent\n+ Use Case\n+ Jurisdiction"]
+    CONSENT -->|rejected or missing| BLOCKED["Access Denied\nSession ends"]
+    CONSENT -->|approved| BASELINE
+
+    subgraph SETUP ["Phase 1 — Baseline Setup (90–180s)"]
+        BASELINE["Record neutral baseline\n'Talk naturally for 90–180 seconds'"]
+        BASELINE --> BQUALITY{"Baseline quality\nacceptable?"}
+        BQUALITY -->|no| RETRY_B["Retry baseline\n(bad audio/video)"]
+        RETRY_B --> BASELINE
+        BQUALITY -->|yes| CALIBRATED["Personal baseline stored\n(robust z-score per cue)"]
+    end
+
+    CALIBRATED --> QUESTION
+
+    subgraph ANALYSIS ["Phase 2 — Live Analysis"]
+        QUESTION["Ask question / Play clip\n(15–30s per response)"]
+        QUESTION --> CAPTURE["Capture response clip\n(video + audio)"]
+        CAPTURE --> QGATE{"Input quality\nacceptable?\n(720p+, clean audio)"}
+        QGATE -->|no| ABSTAIN["Abstain\n'Insufficient quality to score'"]
+        QGATE -->|yes| EXTRACT["Extract behavioral cues\n(66 signals across 5 modalities)"]
+        EXTRACT --> NORMALIZE["Normalize vs baseline\n(delta from your personal neutral)"]
+        NORMALIZE --> FUSE["Fuse signals\n(Bayesian log-odds + convergence gate)"]
+        FUSE --> GATE{"2+ independent\nmodality families\nconverge?"}
+        GATE -->|no| ABSTAIN
+        GATE -->|yes| SCORE["Risk score + uncertainty\n(0.0 → 1.0, abstain threshold)"]
+    end
+
+    SCORE --> REPORT["Narrative report\n+ top contributing cues\n+ confidence interval"]
+    SCORE --> LOG["Audit log written\n(session, timestamp, use case)"]
+    ABSTAIN --> LOG
+
+    REPORT --> NEXT{"Analyze another\nresponse?"}
+    NEXT -->|yes| QUESTION
+    NEXT -->|no| DONE(["Session complete"])
+```
+
+---
+
+### Data States & Privacy
+
+What form your data takes at every step — and what leaves your device.
+
+```mermaid
+flowchart TD
+    subgraph INPUT ["User Input"]
+        R1["CLI: local file\n.mp4 / .mov / .wav"]
+        R2["SDK: file object\nor numpy array"]
+        R3["Chrome Extension:\nlive tab/mic chunks"]
+        R4["REST API:\nmultipart or stream"]
+    end
+
+    R1 & R2 & R3 & R4 --> SE["SessionEnvelope\nsession_id · consent flags\nretention policy · use_case"]
+
+    SE --> NM["NormalizedMedia\nstandardized fps + audio\nsegmented clips\n⚠ Highest sensitivity"]
+
+    NM --> FE["Feature Extraction\n— ALL LOCAL —\nVisual · Audio · Linguistic\nPhysio · CBCA/RM"]
+
+    FE --> FG["FeatureGraph\ntime-aligned vectors\nper-cue confidence scores"]
+
+    NM -.->|"deleted after\nextraction"| TRASH1["🗑 raw media freed"]
+
+    FG --> SC["ScoredCues\nBayesian fused score\nuncertainty estimate\ntop contributing cues"]
+
+    SC --> GATE{"Convergence Gate\n2+ modality families?"}
+    GATE -->|no| ABS["BlitzOutput: ABSTAIN"]
+    GATE -->|yes| CP
+
+    CP["CuePacket  ← OUTBOUND BOUNDARY\n✅ JSON only — no raw video/audio\nrisk_score · modality_scores\ntop_cues · evidence_spans"]
+
+    CP -->|"Claude API call"| NT["NarrativeText\nhuman-readable explanation\nconfidence framing + caveats"]
+
+    SC & NT --> FR["FinalReport\nrisk_score · uncertainty\ncue_summary · narrative\nnot_for_sole_decision: true"]
+
+    FR --> O1["CLI / SDK output"]
+    FR --> O2["REST JSON response"]
+    FR --> O3["VHS signal widget"]
+    FR --> S1["AuditLog + SessionRecord\nstored locally"]
+
+    S1 -.->|"temp buffers\nwiped at close"| TRASH2["🗑 no raw media retained"]
+```
+
+---
+
+### Application Adapters
+
+How CLI, REST API, Chrome Extension, and Python SDK all route through the ethics gate into one core engine.
+
+```mermaid
+flowchart TB
+    subgraph INPUTS ["Input Sources"]
+        CLI["CLI\n`blitz analyze video.mp4`"]
+        API["REST API\nPOST /analyze"]
+        EXT["Chrome Extension\nLive tab capture"]
+        SDK["Python SDK\nblitz.run(path)"]
+    end
+
+    subgraph GATE ["Ethics & Consent Gate"]
+        CONSENT["Validates:\nconsent · use_case · jurisdiction\n\nBlocks: hiring · law enforcement\nhealthcare · EU high-risk"]
+    end
+
+    CLI --> CONSENT
+    API --> CONSENT
+    EXT --> CONSENT
+    SDK --> CONSENT
+
+    CONSENT -->|pass| ENGINE
+    CONSENT -->|fail| REJECTED["Request rejected\n403 + reason"]
+
+    subgraph ENGINE ["Blitz Engine Core"]
+        INGEST["Ingestion + Quality Gate"]
+        INGEST --> FEATURES["Feature Extraction\n5 modality plugins"]
+        FEATURES --> CALIB["Baseline Calibration"]
+        CALIB --> FUSION["Bayesian Fusion\n+ Convergence Gate"]
+        FUSION --> OUT["BlitzOutput\nscore · uncertainty · cues · narrative"]
+    end
+
+    OUT --> TERMINAL["Terminal report\n(CLI / SDK)"]
+    OUT --> JSON["JSON response\n(API / SDK)"]
+    OUT --> WIDGET["VHS signal widget\n(Extension)"]
+    OUT --> AUDITLOG["Audit log\n(all adapters)"]
+```
+
+---
+
 ## Architecture
 
 ```
