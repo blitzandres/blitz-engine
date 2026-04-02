@@ -57,134 +57,140 @@ The 85-99% numbers in papers are lab overfitting on tiny datasets (121-320 clips
 
 ## How It Works
 
-### User Session Flow
+### 1 · User Session Flow
 
-From consent gate through baseline calibration, live analysis, and final report — or an explicit abstain when quality is insufficient.
+Consent gate → 90–180s personal baseline → per-response analysis → convergence gate → verdict or explicit abstain.
 
 ```mermaid
 flowchart TD
     START(["User opens Blitz Engine\n(CLI / Extension / API)"])
 
-    START --> CONSENT["Provide Consent\n+ Use Case\n+ Jurisdiction"]
-    CONSENT -->|rejected or missing| BLOCKED["Access Denied\nSession ends"]
+    START --> CONSENT["Consent Gate\n─────────────────────\nvalidates: consent flag\nuse_case field\njurisdiction field"]
+    CONSENT -->|"missing or blocked use_case"| BLOCKED["403 Access Denied\nno session created"]
     CONSENT -->|approved| BASELINE
 
-    subgraph SETUP ["Phase 1 — Baseline Setup (90–180s)"]
-        BASELINE["Record neutral baseline\n'Talk naturally for 90–180 seconds'"]
-        BASELINE --> BQUALITY{"Baseline quality\nacceptable?"}
-        BQUALITY -->|no| RETRY_B["Retry baseline\n(bad audio/video)"]
+    subgraph SETUP ["PHASE 1 — Baseline Calibration  (90–180s)"]
+        BASELINE["Record neutral baseline clip\n─────────────────────\nCaptures: FramePacket stream\n+ AudioChunkPacket stream\nduring neutral speech"]
+        BASELINE --> BQUALITY{"Quality gate\nface tracked?\nclean audio?"}
+        BQUALITY -->|fail| RETRY_B["Retry — bad input\n(return reason to user)"]
         RETRY_B --> BASELINE
-        BQUALITY -->|yes| CALIBRATED["Personal baseline stored\n(robust z-score per cue)"]
+        BQUALITY -->|pass| CALIBRATED["BaselineProfile stored\n─────────────────────\nper-cue: median + MAD\n(robust z-score anchors)\nExpires at session end"]
     end
 
     CALIBRATED --> QUESTION
 
-    subgraph ANALYSIS ["Phase 2 — Live Analysis"]
-        QUESTION["Ask question / Play clip\n(15–30s per response)"]
-        QUESTION --> CAPTURE["Capture response clip\n(video + audio)"]
-        CAPTURE --> QGATE{"Input quality\nacceptable?\n(720p+, clean audio)"}
-        QGATE -->|no| ABSTAIN["Abstain\n'Insufficient quality to score'"]
-        QGATE -->|yes| EXTRACT["Extract behavioral cues\n(66 signals across 5 modalities)"]
-        EXTRACT --> NORMALIZE["Normalize vs baseline\n(delta from your personal neutral)"]
-        NORMALIZE --> FUSE["Fuse signals\n(Bayesian log-odds + convergence gate)"]
-        FUSE --> GATE{"2+ independent\nmodality families\nconverge?"}
+    subgraph ANALYSIS ["PHASE 2 — Per-Response Analysis  (15–30s per clip)"]
+        QUESTION["Question asked / clip played"]
+        QUESTION --> CAPTURE["Capture response\nFramePacket + AudioChunkPacket"]
+        CAPTURE --> QGATE{"Input quality?\n720p+, stable face\nclean audio, SNR ok"}
+        QGATE -->|fail| ABSTAIN["BlitzOutput: ABSTAIN\nreason: input_quality_insufficient"]
+        QGATE -->|pass| EXTRACT["Feature Extraction — all local\n5 modality chains in parallel\n→ VisualCueFrame\n→ AudioCueWindow\n→ LinguisticCueWindow\n→ PhysioCueWindow\n→ CBCAPacket"]
+        EXTRACT --> NORMALIZE["Baseline Normalization\n─────────────────────\nz_i = (x − median) / (1.4826×MAD)\nper cue, vs personal baseline"]
+        NORMALIZE --> FUSE["Bayesian Fusion\nlogit(P) = logit(0.30)\n+ Σ[w_i × (d_i×z_i − d_i²/2)]"]
+        FUSE --> GATE{"Convergence Gate\nposterior > 0.65\nAND active_families ≥ 2?"}
         GATE -->|no| ABSTAIN
-        GATE -->|yes| SCORE["Risk score + uncertainty\n(0.0 → 1.0, abstain threshold)"]
+        GATE -->|yes| SCORE["PosteriorPacket → BlitzOutput\nrisk_score · uncertainty\ncue_attribution ranked"]
     end
 
-    SCORE --> REPORT["Narrative report\n+ top contributing cues\n+ confidence interval"]
-    SCORE --> LOG["Audit log written\n(session, timestamp, use case)"]
+    SCORE -->|"CuePacket JSON only\n→ Claude API"| NARRATIVE["NarrativeText returned\nhuman-readable · caveats included"]
+    NARRATIVE --> REPORT["BlitzOutput FINAL\nrisk_score · uncertainty\ncue_attribution · narrative\nnot_for_sole_decision: true"]
     ABSTAIN --> LOG
+    REPORT --> LOG["AuditLog written\nsession_id · timestamp · use_case"]
 
-    REPORT --> NEXT{"Analyze another\nresponse?"}
+    REPORT --> NEXT{"Analyze\nanother response?"}
     NEXT -->|yes| QUESTION
-    NEXT -->|no| DONE(["Session complete"])
+    NEXT -->|no| DONE(["Session complete\nraw media wiped from memory"])
 ```
 
 ---
 
-### Data States & Privacy
+### 2 · Modality Extraction — Technical Sequence
 
-What form your data takes at every step — and what leaves your device.
+Each modality chain runs in parallel. Data passes as typed packet objects between library calls, joined into a feature bus before fusion.
+
+```mermaid
+flowchart LR
+    subgraph VISUAL ["VISUAL  (per frame)"]
+        direction TB
+        V1["MediaPipe FaceMesh\n→ FaceMeshPacket\nlandmarks_3d[478]\nblink_EAR, tracking_conf"]
+        V1 -->|"visual.facemesh.ready"| V2["OpenGraphAU\n→ AUPacket\nau_intensity[41 keys]\nau_presence[41 keys]"]
+        V1 -->|"cached frame"| V3["MMPose / rtmlib\n→ Pose133Packet\nkeypoints_133[{x,y,conf}]"]
+        V1 -->|"cached frame"| V4["InsightFace\n→ GazeHeadPacket\nhead_pose{yaw,pitch,roll}\ngaze{yaw,pitch,eye_contact_prob}"]
+        V2 & V3 & V4 -->|"join by frame_id\nmodality.visual.ready"| VCUE["VisualCueFrame\nblink_rate_hz · au_41\npose_133 · head_pose · gaze\nquality{face_ok, pose_ok}"]
+    end
+
+    subgraph AUDIO ["AUDIO  (per 1s window)"]
+        direction TB
+        A1["librosa\n→ ProsodyPacket\nf0_hz_series, voiced_prob\nrms_series, f0_mean/std"]
+        A1 -->|"audio.prosody.ready"| A2["Parselmouth/Praat\n→ VoiceQualityPacket\njitter · shimmer · hnr_db\ntremor_index"]
+        A2 -->|"audio.voice_quality.ready"| A3["CrisperWhisper\n→ TranscriptPacket\ntext · words[{w,start_ms,conf}]\nfiller_words[{w,start_ms}]"]
+        A3 -->|"audio.asr.ready"| A4["vitallens rPPG\n→ CardioPacket\nhr_bpm · hrv_rmssd_ms\nrr_intervals_ms"]
+        A1 & A2 & A3 & A4 -->|"join by time window\nmodality.audio.ready"| ACUE["AudioCueWindow\nprosody · voice_quality\nasr · cardio · quality{snr_db}"]
+    end
+
+    subgraph LING ["LINGUISTIC  (per utterance)"]
+        direction TB
+        L1["spaCy nlp(text)\n→ SpacyPacket\npos/ner/morph/dep counts\ndoc_len_tokens"]
+        L1 -->|"ling.spacy.ready"| L2["VADER\n→ VaderPacket\nsentiment{neg,neu,pos,compound}"]
+        L2 -->|"ling.vader.ready"| L3["NRCLex\n→ NRCEmotionPacket\nemotions8{anger,fear,trust...}"]
+        L3 -->|"ling.nrc.ready"| L4["TextDescriptives\n→ TextDescPacket\nreadability · coherence\ncomplexity{ttr,mean_sent_len}"]
+        L4 -->|"ling.textdesc.ready"| L5["SentenceTransformer\n→ SemanticPacket\ncbca_semantic_distance\ncontradiction_distance"]
+        L1 & L2 & L3 & L4 & L5 -->|"join by utterance_id\nmodality.linguistic.ready"| LCUE["LinguisticCueWindow\nspacy · sentiment · emotions8\ntextdesc · semantic · transcript_ref"]
+    end
+
+    subgraph PHYSIO ["PHYSIO  (per window)"]
+        direction TB
+        P1["vitallens multi-ROI\n→ PhysioCueWindow\nroi_delta{forehead,cheekL,cheekR,chin}\nroi_divergence_index\nperfusion_asymmetry"]
+        P1 -->|"modality.physiological.ready"| PCUE["PhysioCueWindow ✓"]
+    end
+
+    subgraph CBCA ["CBCA/RM  (needs ling + visual)"]
+        direction TB
+        CB1["cbca_rm_score(\n  LinguisticCueWindow,\n  VisualCueFrame[]\n)\n→ CBCAPacket\ncbca_criteria_scores[dict]\nrm_score · statement_quality"]
+        CB1 -->|"cbca.ready"| CCUE["CBCAPacket ✓"]
+    end
+
+    VCUE & ACUE & LCUE & PCUE & CCUE -->|"all modalities present\n→ Fusion Stage"| FUSE(["→ Fusion"])
+```
+
+---
+
+### 3 · Fusion & Output — Technical Sequence
+
+Four staged fusion pipeline: evidence collection → baseline normalization → Bayesian accumulation → convergence gate → BlitzOutput → Claude narrative.
 
 ```mermaid
 flowchart TD
-    subgraph INPUT ["User Input"]
-        R1["CLI: local file\n.mp4 / .mov / .wav"]
-        R2["SDK: file object\nor numpy array"]
-        R3["Chrome Extension:\nlive tab/mic chunks"]
-        R4["REST API:\nmultipart or stream"]
-    end
+    IN(["← 5 modality feature buses"])
 
-    R1 & R2 & R3 & R4 --> SE["SessionEnvelope\nsession_id · consent flags\nretention policy · use_case"]
+    IN --> S1["STAGE 1 · Per-Cue Evidence\n─────────────────────────────\nCueEvidencePacket\ncues: list of {\n  cue_id, modality_family\n  x: raw cue value\n  d_i: effect size weight\n  reliability_w: cue reliability\n  llr_raw: log-likelihood ratio\n}\npublish: fusion.evidence.ready"]
 
-    SE --> NM["NormalizedMedia\nstandardized fps + audio\nsegmented clips\n⚠ Highest sensitivity"]
+    S1 -->|"baseline.ready = true\n(90–180s stats loaded)"| S2
 
-    NM --> FE["Feature Extraction\n— ALL LOCAL —\nVisual · Audio · Linguistic\nPhysio · CBCA/RM"]
+    S2["STAGE 2 · Robust Baseline Normalization\n─────────────────────────────\nNormalizedEvidencePacket\nper cue:\n  z_i = (x − median) / (1.4826 × MAD + ε)\n  median, MAD from baseline window\n─────────────────────────────\nRolling baseline: 90–180s window\nRobust Z — not standard Z\nOutlier resistance via MAD\npublish: fusion.normalized.ready"]
 
-    FE --> FG["FeatureGraph\ntime-aligned vectors\nper-cue confidence scores"]
+    S2 --> S3["STAGE 3 · Bayesian Log-Odds Accumulation\n─────────────────────────────\nPosteriorPacket\nlog_odds: float\nposterior = sigmoid(log_odds)\ncontributing_cues ranked by |w_i × d_i × z_i|\nactive_families: set of modality names\n─────────────────────────────\nFORMULA:\nlogit(P) = logit(0.30)\n         + Σ [ w_i × (d_i × z_i − d_i²/2) ]\n\nPrior = 0.30 (avoids overconfidence)\nw_i = reliability_w\nd_i = effect size weight\nz_i = baseline-normalized value\npublish: fusion.posterior.updated  (each window)"]
 
-    NM -.->|"deleted after\nextraction"| TRASH1["🗑 raw media freed"]
+    S3 --> GATE{"STAGE 4 · Convergence Gate\n─────────────────────────────\nDecisionPacket\npassed = (posterior > 0.65)\n       AND (active_families ≥ 2)\n─────────────────────────────\nBlocks single-modality false alarms\nRequires cross-modal agreement"}
 
-    FG --> SC["ScoredCues\nBayesian fused score\nuncertainty estimate\ntop contributing cues"]
+    GATE -->|"passed = false\naccumulate next window"| S3
 
-    SC --> GATE{"Convergence Gate\n2+ modality families?"}
-    GATE -->|no| ABS["BlitzOutput: ABSTAIN"]
-    GATE -->|yes| CP
+    GATE -->|"passed = true\ndecision.ready"| BUILD
 
-    CP["CuePacket  ← OUTBOUND BOUNDARY\n✅ JSON only — no raw video/audio\nrisk_score · modality_scores\ntop_cues · evidence_spans"]
+    BUILD["BlitzOutput Builder\n─────────────────────────────\nrisk_score = posterior\nuncertainty = posterior variance\ncue_attribution: list of {\n  cue_id · modality_family\n  weight · direction · evidence\n}\nnarrative = null  ← filled next\nnot_for_sole_decision = true  ← hardcoded\npublish: output.blitz.ready"]
 
-    CP -->|"Claude API call"| NT["NarrativeText\nhuman-readable explanation\nconfidence framing + caveats"]
+    BUILD -->|"OUTBOUND BOUNDARY\nno raw media crosses this line"| CLAUDE
 
-    SC & NT --> FR["FinalReport\nrisk_score · uncertainty\ncue_summary · narrative\nnot_for_sole_decision: true"]
+    CLAUDE["CuePacket → Claude API\n─────────────────────────────\n✅ JSON only\n✅ No raw video / audio\n✅ No full ASR transcript\n─────────────────────────────\n{\n  session_id\n  risk_score, uncertainty\n  top_cues: [{\n    label, modality_family\n    signed_strength, short_evidence\n  }]\n  constraints: {no_raw_media: true}\n}\n─────────────────────────────\nClaude returns → NarrativeText"]
 
-    FR --> O1["CLI / SDK output"]
-    FR --> O2["REST JSON response"]
-    FR --> O3["VHS signal widget"]
-    FR --> S1["AuditLog + SessionRecord\nstored locally"]
+    CLAUDE --> FINAL["BlitzOutput FINAL\n─────────────────────────────\nrisk_score: float\nuncertainty: float\ncue_attribution: list\nnarrative: str\nnot_for_sole_decision: true\nmetadata: {session_id, t_end_ms, model_version}"]
 
-    S1 -.->|"temp buffers\nwiped at close"| TRASH2["🗑 no raw media retained"]
-```
+    FINAL --> CLI["CLI / SDK\nterminal + JSON"]
+    FINAL --> API2["REST API\nJSON response"]
+    FINAL --> EXT["Chrome Extension\nVHS signal widget"]
+    FINAL --> AUDIT["AuditLog\nsession · timestamp · use_case · config_hash"]
 
----
-
-### Application Adapters
-
-How CLI, REST API, Chrome Extension, and Python SDK all route through the ethics gate into one core engine.
-
-```mermaid
-flowchart TB
-    subgraph INPUTS ["Input Sources"]
-        CLI["CLI\n`blitz analyze video.mp4`"]
-        API["REST API\nPOST /analyze"]
-        EXT["Chrome Extension\nLive tab capture"]
-        SDK["Python SDK\nblitz.run(path)"]
-    end
-
-    subgraph GATE ["Ethics & Consent Gate"]
-        CONSENT["Validates:\nconsent · use_case · jurisdiction\n\nBlocks: hiring · law enforcement\nhealthcare · EU high-risk"]
-    end
-
-    CLI --> CONSENT
-    API --> CONSENT
-    EXT --> CONSENT
-    SDK --> CONSENT
-
-    CONSENT -->|pass| ENGINE
-    CONSENT -->|fail| REJECTED["Request rejected\n403 + reason"]
-
-    subgraph ENGINE ["Blitz Engine Core"]
-        INGEST["Ingestion + Quality Gate"]
-        INGEST --> FEATURES["Feature Extraction\n5 modality plugins"]
-        FEATURES --> CALIB["Baseline Calibration"]
-        CALIB --> FUSION["Bayesian Fusion\n+ Convergence Gate"]
-        FUSION --> OUT["BlitzOutput\nscore · uncertainty · cues · narrative"]
-    end
-
-    OUT --> TERMINAL["Terminal report\n(CLI / SDK)"]
-    OUT --> JSON["JSON response\n(API / SDK)"]
-    OUT --> WIDGET["VHS signal widget\n(Extension)"]
-    OUT --> AUDITLOG["Audit log\n(all adapters)"]
+    GATE -->|"quality gate failed\nbefore reaching posterior > 0.65"| ABS["BlitzOutput: ABSTAIN\nrisk_score: null\nreason: convergence_not_reached\n     OR input_quality_insufficient\nStill writes to AuditLog"]
 ```
 
 ---

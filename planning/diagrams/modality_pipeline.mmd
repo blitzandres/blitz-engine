@@ -1,0 +1,109 @@
+---
+title: Blitz Engine — Modality Extraction Pipelines (Technical)
+---
+flowchart TB
+
+    INPUT["FramePacket + AudioChunkPacket\n─────────────────────────────\nFramePacket: {session_id, frame_id, ts_ms, fps, image_bgr[H,W,3]}\nAudioChunkPacket: {session_id, chunk_id, t0_ms, t1_ms, sr, samples_f32[N]}"]
+
+    INPUT --> VISUAL_CHAIN
+    INPUT --> AUDIO_CHAIN
+
+    subgraph VISUAL_CHAIN ["VISUAL CHAIN  (per frame)"]
+        direction TB
+        V1["cv2.cvtColor BGR→RGB\n→ mp.FaceMesh.process(rgb)\n─────────────────────────────\nFaceMeshPacket\nlandmarks_3d[478 × {x,y,z}]\nblink_EAR_{left,right}: float\ntracking_conf: float"]
+
+        V1 -->|"tracking_conf ≥ min_conf\npublish: visual.facemesh.ready"| V2
+
+        V2["OpenGraphAU.predict(landmarks, bbox)\n─────────────────────────────\nAUPacket\nau_intensity: dict[41 keys → float]\nau_presence: dict[41 keys → bool]\nmodel_conf: float"]
+
+        V1 -->|"same frame → cached"| V3
+
+        V3["MMPoseInferencer('wholebody')\n─────────────────────────────\nPose133Packet\nkeypoints_133: list[{x, y, conf}]\nbody_bbox_xyxy: tuple[int×4]"]
+
+        V1 -->|"same frame → cached"| V4
+
+        V4["InsightFace.get(frame)\n─────────────────────────────\nGazeHeadPacket\nhead_pose: {yaw, pitch, roll}\ngaze: {yaw, pitch, eye_contact_prob}\nface_conf: float"]
+
+        V2 & V3 & V4 -->|"join by (session_id, frame_id)\nor join-timeout fallback\npublish: modality.visual.ready"| VCUE
+
+        VCUE["VisualCueFrame\n─────────────────────────────\nblink_rate_hz: float\nau_41: dict[str→float]\npose_133: list[{x,y,conf}]\nhead_pose: {yaw, pitch, roll}\ngaze: {yaw, pitch, eye_contact_prob}\nquality: {face_track_ok, pose_ok}"]
+    end
+
+    subgraph AUDIO_CHAIN ["AUDIO CHAIN  (per 1s window)"]
+        direction TB
+        A1["librosa.pyin(samples, sr)\nlibrosa.feature.rms(samples)\n─────────────────────────────\nProsodyPacket\nf0_hz_series: list[float|None]\nvoiced_prob: list[float]\nrms_series: list[float]\nstats: {f0_mean, f0_std, rms_mean}"]
+
+        A1 -->|"publish: audio.prosody.ready"| A2
+
+        A2["parselmouth.Sound + praat.call\n─────────────────────────────\nVoiceQualityPacket\njitter_local: float\nshimmer_local: float\nhnr_db: float\ntremor_index: float\nquality_conf: float"]
+
+        A2 -->|"publish: audio.voice_quality.ready"| A3
+
+        A3["crisperwhisper.transcribe(audio,\n  word_timestamps=True,\n  detect_fillers=True)\n─────────────────────────────\nTranscriptPacket\ntext: str\nwords: list[{w, start_ms, end_ms, conf}]\nfiller_words: list[{w, start_ms, end_ms}]\nasr_conf: float"]
+
+        A3 -->|"publish: audio.asr.ready"| A4
+
+        A4["vitallens.rppg(face_roi_frames)\n─────────────────────────────\nCardioPacket\nhr_bpm: float\nhrv_rmssd_ms: float\nrr_intervals_ms: list[float]\nsignal_quality: float"]
+
+        A1 & A2 & A3 & A4 -->|"join by (session_id, time window)\nor timeout policy\npublish: modality.audio.ready"| ACUE
+
+        ACUE["AudioCueWindow\n─────────────────────────────\nprosody: {f0_mean, f0_std, rms_mean}\nvoice_quality: {jitter, shimmer, hnr, tremor}\nasr: TranscriptPacket ref\ncardio: {hr_bpm, hrv_rmssd_ms}\nquality: {snr_db, asr_ok}"]
+    end
+
+    ACUE -->|"TranscriptPacket triggers\nlinguistic chain"| LING_CHAIN
+
+    subgraph LING_CHAIN ["LINGUISTIC CHAIN  (per utterance)"]
+        direction TB
+        L1["spacy.load().nlp(text)\n─────────────────────────────\nSpacyPacket\npos_counts: dict[str→int]\nner_counts: dict[str→int]\nmorph_counts: dict[str→int]\ndep_counts: dict[str→int]\ndoc_len_tokens: int"]
+
+        L1 -->|"publish: ling.spacy.ready"| L2
+
+        L2["SentimentIntensityAnalyzer()\n  .polarity_scores(text)\n─────────────────────────────\nVaderPacket\nsentiment: {neg, neu, pos, compound}"]
+
+        L2 -->|"publish: ling.vader.ready"| L3
+
+        L3["NRCLex(text).affect_frequencies\n─────────────────────────────\nNRCEmotionPacket\nemotions8: {anger, fear, anticipation,\ntrust, surprise, sadness, joy, disgust}"]
+
+        L3 -->|"publish: ling.nrc.ready"| L4
+
+        L4["textdescriptives pipeline (spaCy)\n─────────────────────────────\nTextDescPacket\nreadability: {flesch, gunning_fog}\ncoherence: {entity_density, local_coherence}\ncomplexity: {ttr, mean_sent_len}"]
+
+        L4 -->|"publish: ling.textdesc.ready"| L5
+
+        L5["SentenceTransformer.encode(text)\n+ cosine_distance vs prior statements\n─────────────────────────────\nSemanticPacket\ncbca_semantic_distance: float\ncontradiction_distance: float"]
+
+        L1 & L2 & L3 & L4 & L5 -->|"join by utterance_id\npublish: modality.linguistic.ready"| LCUE
+
+        LCUE["LinguisticCueWindow\n─────────────────────────────\nspacy: SpacyPacket\nsentiment: VaderPacket\nemotions8: NRCEmotionPacket\ntextdesc: TextDescPacket\nsemantic: SemanticPacket\ntranscript_ref: {text, top_fillers}"]
+    end
+
+    subgraph PHYSIO_CHAIN ["PHYSIOLOGICAL CHAIN  (per window)"]
+        direction TB
+        P1["vitallens multi-ROI extraction\n─────────────────────────────\nPhysioCueWindow\nroi_delta: {forehead, cheekL,\ncheekR, chin} → float\nroi_divergence_index: float\nperfusion_asymmetry: float\nquality: float"]
+        P1 -->|"publish: modality.physiological.ready"| PCUE["PhysioCueWindow ✓"]
+    end
+
+    subgraph CBCA_CHAIN ["CBCA/RM CHAIN  (per utterance, needs ling + visual)"]
+        direction TB
+        CB1["cbca_rm_score(\n  LinguisticCueWindow,\n  aligned VisualCueFrame[]\n)\n─────────────────────────────\nCBCAPacket\ncbca_criteria_scores: dict[str→float]\nrm_score: float\nstatement_quality_score: float\nconfidence: float"]
+        CB1 -->|"publish: cbca.ready"| CCUE["CBCAPacket ✓"]
+    end
+
+    LCUE --> CB1
+    VCUE --> CB1
+    VCUE --> PHYSIO_CHAIN
+
+    VCUE & ACUE & LCUE & PCUE & CCUE -->|"all modalities ready\n→ pass to Fusion Stage"| FUSE_IN
+
+    FUSE_IN(["→ Fusion Pipeline\nsee: fusion_detail diagram"])
+
+    classDef packet fill:#e4f0ff,stroke:#356aa0,color:#111;
+    classDef lib fill:#f0f0ff,stroke:#6655bb,color:#111;
+    classDef bus fill:#e7f7e7,stroke:#3d7a3d,color:#111;
+    classDef input fill:#fff7dc,stroke:#8a6d1f,color:#222;
+    classDef output fill:#ffe5e5,stroke:#b55252,color:#111;
+
+    class V1,V2,V3,V4,A1,A2,A3,A4,L1,L2,L3,L4,L5,P1,CB1 lib;
+    class VCUE,ACUE,LCUE,PCUE,CCUE bus;
+    class INPUT input;
+    class FUSE_IN output;

@@ -1,0 +1,72 @@
+---
+title: Blitz Engine — Fusion Pipeline & Output (Technical)
+---
+flowchart TD
+
+    IN(["← 5 Modality Feature Buses\nVisualCueFrame · AudioCueWindow\nLinguisticCueWindow · PhysioCueWindow · CBCAPacket"])
+
+    IN --> S21
+
+    subgraph FUSION ["BAYESIAN FUSION  (4 stages)"]
+        direction TB
+
+        S21["STAGE 1 — Per-Cue Evidence\n─────────────────────────────\nCueEvidencePacket\ncues: list of {\n  cue_id: str\n  modality_family: str\n  x: float          ← raw cue value\n  d_i: float        ← effect size weight\n  reliability_w: float  ← cue reliability\n  llr_raw: float    ← log-likelihood ratio\n}\n─────────────────────────────\npublish: fusion.evidence.ready"]
+
+        S21 -->|"baseline.ready = true\n(90-180s stats available)\npublish: fusion.normalized.ready"| S22
+
+        S22["STAGE 2 — Baseline Normalization\n─────────────────────────────\nNormalizedEvidencePacket\ncues: list of {\n  cue_id: str\n  modality_family: str\n  z_i: float        ← robust z-score\n  median: float     ← from baseline window\n  mad: float        ← median absolute deviation\n  d_i: float\n  reliability_w: float\n}\n─────────────────────────────\nFORMULA:\nz_i = (x − median_baseline) / (1.4826 × MAD + ε)\n\nBaseline window: rolling 90–180s\nNormalization: Robust Z (NOT standard Z)\nOutlier resistance via MAD not std"]
+
+        S22 -->|"each window update\npublish: fusion.posterior.updated"| S23
+
+        S23["STAGE 3 — Bayesian Log-Odds Accumulation\n─────────────────────────────\nPosteriorPacket\nlog_odds: float\nposterior: float\ncontributing_cues: list[{cue_id, contribution}]\nactive_families: set[str]\n─────────────────────────────\nFORMULA (per window):\nlogit(P) = logit(0.30) + Σ [ w_i × (d_i × z_i − d_i²/2) ]\nposterior = sigmoid(log_odds)\n\nPrior: 0.30 (not 0.50 — avoids overconfidence)\nw_i  = reliability_w per cue\nd_i  = effect size weight\nz_i  = baseline-normalized cue value\n─────────────────────────────\nRolling: accumulates per question window\nTop contributors ranked by |w_i × d_i × z_i|"]
+
+        S23 -->|"check gate conditions\nevery update cycle"| S24
+
+        S24{"STAGE 4 — Convergence Gate\n─────────────────────────────\nDecisionPacket\nposterior: float\npassed: bool\nfamilies_count: int\n─────────────────────────────\nGATE RULE:\npassed = (posterior > 0.65)\n       AND (active_families ≥ 2)\n\nRequires 2+ independent modality\nfamilies to prevent single-channel\nfalse alarms"}
+
+        S24 -->|"passed = false\ncontinue accumulating"| LOOP["accumulate next window\n→ back to Stage 3"]
+        LOOP --> S23
+    end
+
+    S24 -->|"passed = true\npublish: decision.ready"| S25
+
+    subgraph OUTPUT_BUILD ["OUTPUT CONSTRUCTION"]
+        direction TB
+
+        S25["BlitzOutput Builder (pre-narrative)\n─────────────────────────────\nBlitzOutput (partial)\nrisk_score: float     ← = posterior\nuncertainty: float    ← posterior variance\ncue_attribution: list[{\n  cue_id: str\n  modality_family: str\n  weight: float\n  direction: 'increase'|'decrease'\n  evidence: float\n}]\nnarrative: null       ← filled next step\nmetadata: {session_id, t_end_ms}\n─────────────────────────────\npublish: output.blitz.ready"]
+
+        S25 -->|"build CuePacket\n(strict outbound boundary)"| S26A
+
+        S26A["CuePacket → Claude API\n─────────────────────────────\nOUTBOUND ONLY:\n{\n  session_id: str\n  risk_score: float\n  uncertainty: float\n  top_cues: list[{\n    label: str\n    modality_family: str\n    signed_strength: float\n    short_evidence: str\n  }]\n  constraints: {no_raw_media: true}\n}\n─────────────────────────────\n✅ NO raw video\n✅ NO raw audio\n✅ NO full ASR transcript\nJSON only — external call"]
+
+        S26A -->|"Claude HTTP 200\nreturns NarrativeText"| S26B
+
+        S26B["NarrativeText (from Claude)\n─────────────────────────────\n{\n  narrative: str\n    ← human-readable explanation\n    ← cue-level reasoning\n    ← confidence framing\n    ← built-in caveats\n}"]
+
+        S26B -->|"merge into BlitzOutput\npublish: output.final"| FINAL
+    end
+
+    FINAL["BlitzOutput — FINAL\n─────────────────────────────\nrisk_score: float          0.0 → 1.0\nuncertainty: float         posterior variance\ncue_attribution: list      top cues with weights\nnarrative: str             Claude explanation\nnot_for_sole_decision: true  always hardcoded\nmetadata: {session_id, t_end_ms, model_version}"]
+
+    FINAL --> D1["CLI / SDK\nterminal + JSON"]
+    FINAL --> D2["REST API\nJSON response"]
+    FINAL --> D3["Chrome Extension\nVHS signal widget"]
+    FINAL --> D4["AuditLog\nsession_id · timestamp\nuse_case · config_hash"]
+
+    subgraph ABSTAIN_PATH ["ABSTAIN PATH (quality failure)"]
+        ABS["BlitzOutput: ABSTAIN\n─────────────────────────────\nrisk_score: null\nreason: 'convergence_not_reached'\n     OR 'input_quality_insufficient'\n     OR 'baseline_not_ready'\n─────────────────────────────\nStill writes to AuditLog"]
+    end
+
+    S24 -->|"input quality failed\nbefore fusion"| ABS
+
+    classDef stage fill:#e4f0ff,stroke:#356aa0,color:#111;
+    classDef gate fill:#fff7dc,stroke:#8a6d1f,color:#222;
+    classDef boundary fill:#ffe5e5,stroke:#b55252,color:#111;
+    classDef output fill:#e7f7e7,stroke:#3d7a3d,color:#111;
+    classDef loop fill:#f4f4f4,stroke:#888,color:#555;
+
+    class S21,S22,S23,S25,S26A,S26B stage;
+    class S24 gate;
+    class FINAL,D1,D2,D3,D4 output;
+    class ABS boundary;
+    class LOOP loop;

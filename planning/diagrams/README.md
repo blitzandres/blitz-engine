@@ -4,12 +4,17 @@ These Mermaid files are planning-ready diagram drafts for the Blitz Engine.
 
 ## Files
 
-### Process Diagrams (user-facing)
+### Process Diagrams (user-facing, embedded in README)
 - `user_session_flow.mmd` — full user journey: consent → baseline → analysis → output
 - `adapter_architecture.mmd` — how CLI / API / Chrome Extension / SDK connect to the core
 - `build_phases.mmd` — development roadmap across all 4 phases with accuracy targets
+- `data_states_privacy.mmd` — data states + privacy boundary: RawInput → CuePacket → FinalReport
 
-### Engine Diagrams (internal)
+### Technical Diagrams (detailed internals, embedded in README)
+- `modality_pipeline.mmd` — all 5 modality chains with actual packet names, libraries, and trigger events
+- `fusion_detail.mmd` — fusion stages 1-4 with full Bayesian formula, convergence gate, and output construction
+
+### Engine Diagrams (original, for diagrams.net)
 - `data_transaction_flow.mmd` — end-to-end data movement from capture to report
 - `engine_queue_flow.mmd` — worker/queue pipeline for the engine runtime
 
