@@ -18,9 +18,10 @@ Treat this folder as the authoritative planning copy. External mirrors should be
 | **LIE_DETECTOR_BLUEPRINT.md** | High-level project blueprint with vision, cue catalog (40→66), libraries, constraints, build phases | 31KB | ✅ Final |
 | **ACCURACY_PLAN.md** | Accuracy expectations, quality gates, baseline normalization, scoring formula, Claude prompt strategy | 14KB | ✅ Final |
 | **RESEARCH.md** | Implementation research: 6 gaps resolved, 2 blockers identified, library install methods | 14KB | ✅ Final |
+| **COMPETITIVE_RESEARCH.md** | GitHub landscape survey (Apr 2026): 10 top repos, novel techniques, free datasets, accuracy benchmarks | ~20KB | ✅ Final |
 | **signal_preview.py** | VHS signal monitor preview (terminal animation demo) | 4.1KB | ✅ Runnable |
 
-**Total:** ~100 KB of documentation, research, and code scaffolding
+**Total:** ~120 KB of documentation, research, and code scaffolding
 
 ---
 

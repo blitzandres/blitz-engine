@@ -34,6 +34,7 @@ All planning artifacts consolidated in [`planning/`](planning/) folder:
 | **[planning/LIE_DETECTOR_BLUEPRINT.md](planning/LIE_DETECTOR_BLUEPRINT.md)** | Project blueprint (31KB) — vision, constraints, tech stack, library verification |
 | **[planning/ACCURACY_PLAN.md](planning/ACCURACY_PLAN.md)** | Accuracy strategy (14KB) — quality gates, baseline normalization, scoring formula |
 | **[planning/RESEARCH.md](planning/RESEARCH.md)** | Implementation research (14KB) — 6 gaps resolved, 2 blockers, library install methods |
+| **[planning/COMPETITIVE_RESEARCH.md](planning/COMPETITIVE_RESEARCH.md)** | Competitive landscape (Apr 2026) — 10 top repos, novel techniques, free datasets, accuracy benchmarks |
 | **[planning/signal_preview.py](planning/signal_preview.py)** | VHS signal UI demo — run with `python planning/signal_preview.py` |
 
 `planning/` is the canonical research source tracked in Git. If you keep external mirror copies, sync them from here.
@@ -305,6 +306,23 @@ See [governance/PROHIBITED_USES.md](governance/PROHIBITED_USES.md) for use restr
 
 ---
 
+## Competitive Landscape
+
+Key open-source repositories in this field (full analysis in [planning/COMPETITIVE_RESEARCH.md](planning/COMPETITIVE_RESEARCH.md)):
+
+| Repo | What it does | Relevance |
+|---|---|---|
+| [RH-Lin/MMPDA](https://github.com/RH-Lin/MMPDA) | SVC 2025 winner — cross-domain adaptation | Phase 2 domain shift fix |
+| [dclay0324/ATSFace](https://github.com/dclay0324/ATSFace) | LoRA per-subject calibration → 92% | Phase 2 calibration upgrade |
+| [NMS05/DOLOS-PECL](https://github.com/NMS05/Audio-Visual-Deception-Detection-DOLOS-Dataset-and-Parameter-Efficient-Crossmodal-Learning) | Temporal adapter + crossmodal fusion (ICCV 2023) | Architecture reference |
+| [cai-cong/MDPE](https://github.com/cai-cong/MDPE) | 104hr dataset + Big Five personality (HuggingFace) | Free training data |
+| [ubicomplab/rPPG-Toolbox](https://github.com/ubicomplab/rPPG-Toolbox) | NeurIPS 2023 rPPG — HR/HRV from webcam | vitallens upgrade path |
+| [Redaimao/awesome-deception](https://github.com/Redaimao/awesome-multimodal-deception-detection) | Curated field index | Research tracking |
+
+**Why we're different:** Every published system uses population thresholds on tiny datasets (Michigan = 121 clips). The SVC 2025 cross-domain winner scored 60.43%. Blitz Engine's 70-75% target is achievable specifically because of personal calibration — a measurement advantage, not a model advantage.
+
+---
+
 ## Research Foundation
 
 - DePaulo et al., 2003 — Cues to deception (PMID: 12555795)
@@ -312,4 +330,7 @@ See [governance/PROHIBITED_USES.md](governance/PROHIBITED_USES.md) for use restr
 - Bogaard et al., 2024 — Baselining efficacy (doi:10.1016/j.actpsy.2023.104112)
 - Guo et al., 2023 — DOLOS + PECL (arXiv:2303.12745)
 - Lin et al., 2025 — SVC 2025 challenge results (arXiv:2508.04129)
+- Cai et al., 2024 — MDPE dataset + personality modulation (arXiv:2407.12274)
+- Lee et al., 2023 — ATSFace LoRA calibration (arXiv:2309.01383)
+- Liu et al., 2023 — rPPG-Toolbox (NeurIPS 2023)
 - EU AI Act, 2024 — Regulation 2024/1689
