@@ -68,7 +68,20 @@ print(result.compliance["not_for_sole_decision"])
 - audio cue extraction from files
 - visual cue extraction from frames
 - multi-modal convergence that can actually satisfy the 2-family gate
-- CLI and local API adapters
+- local API adapter
+
+## CLI (Implemented Now)
+
+```bash
+blitz analyze-text \
+  --baseline-file baseline.txt \
+  --response-file response.txt \
+  --question "Where were you Tuesday night?" \
+  --response-latency-ms 900 \
+  --output report.json
+```
+
+`baseline.txt` should contain one neutral baseline sample per line. The CLI writes a stable JSON report to stdout or to `--output`.
 
 ---
 

@@ -56,12 +56,21 @@ What is still not implemented:
 - audio extraction
 - visual cues
 - physiological / rPPG cues
-- REST API / CLI adapters
+- REST API adapter
 
 Install locally from the repo root:
 
 ```bash
 pip install -e .
+```
+
+CLI usage:
+
+```bash
+blitz analyze-text \
+  --baseline-file baseline.txt \
+  --response-file response.txt \
+  --question "Where were you Tuesday night?"
 ```
 
 Minimal text-only example:

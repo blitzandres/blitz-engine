@@ -1,6 +1,9 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from blitz_engine import BlitzEngine
+from blitz_engine.cli import main
 
 
 class TextMVPTests(unittest.TestCase):
@@ -42,6 +45,38 @@ class TextMVPTests(unittest.TestCase):
                 use_case="research",
                 jurisdiction="CA-US",
             )
+
+    def test_cli_writes_json_report(self):
+        with TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            baseline = tmp / "baseline.txt"
+            response = tmp / "response.txt"
+            output = tmp / "report.json"
+
+            baseline.write_text(
+                "\n".join([
+                    "I drove to work and grabbed coffee before the meeting.",
+                    "My usual breakfast is eggs, toast, and tea at home.",
+                    "Last weekend I cleaned the apartment and watched a movie.",
+                    "I usually walk to the store in the afternoon for groceries.",
+                    "My morning routine starts with stretching and checking messages.",
+                ])
+            )
+            response.write_text("Honestly, I really do not know, um, I was basically with someone at that place.")
+
+            exit_code = main([
+                "analyze-text",
+                "--baseline-file", str(baseline),
+                "--response-file", str(response),
+                "--question", "Where were you Tuesday night?",
+                "--response-latency-ms", "900",
+                "--output", str(output),
+            ])
+
+            self.assertEqual(exit_code, 0)
+            payload = output.read_text()
+            self.assertIn('"risk_score"', payload)
+            self.assertIn('"session_id"', payload)
 
 
 if __name__ == "__main__":

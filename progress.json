@@ -34,24 +34,29 @@
       "id": "packaging",
       "status": "done",
       "details": "Added pyproject.toml for editable local installation."
+    },
+    {
+      "id": "cli-and-reporting",
+      "status": "done",
+      "details": "Added blitz CLI support for analyze-text plus stable JSON serialization helpers."
     }
   ],
   "current_limitations": [
     "Only the linguistic modality is implemented.",
     "The global convergence gate still requires 2 modality families, so text-only runs can score high but will not pass the gate.",
-    "No CLI, FastAPI app, or dataset harness exists yet.",
+    "No FastAPI app or dataset harness exists yet.",
     "Cue extraction is heuristic and dependency-light; it is not benchmarked."
   ],
   "next_recommended_steps": [
     {
       "priority": 1,
-      "task": "Build apps/cli/",
-      "reason": "Fastest way to make the current MVP usable from the terminal and produce JSON reports."
+      "task": "Build modalities/audio/",
+      "reason": "Audio is the next practical modality and will allow the convergence gate to become meaningful."
     },
     {
       "priority": 2,
-      "task": "Build modalities/audio/",
-      "reason": "Audio is the next practical modality and will allow the convergence gate to become meaningful."
+      "task": "Build apps/web-api/",
+      "reason": "A local API is the next adapter needed for browser or UI work."
     },
     {
       "priority": 3,
@@ -66,7 +71,9 @@
   ],
   "files_touched": [
     "blitz_engine/__init__.py",
+    "blitz_engine/cli.py",
     "blitz_engine/engine.py",
+    "blitz_engine/reporting.py",
     "core/__init__.py",
     "core/calibration/__init__.py",
     "core/calibration/baseline.py",
