@@ -65,10 +65,28 @@ print(result.compliance["not_for_sole_decision"])
 
 ## Planned Next
 
-- audio cue extraction from files
 - visual cue extraction from frames
 - multi-modal convergence that can actually satisfy the 2-family gate
 - local API adapter
+
+## Audio Modality (Implemented Now)
+
+The engine accepts 16-bit PCM `.wav` files through the Python API.
+
+```python
+engine = BlitzEngine(modalities=["linguistic", "audio"])
+session = engine.new_session(
+    baseline_texts=[...],
+    baseline_audio_files=["baseline_1.wav", "baseline_2.wav", "baseline_3.wav"],
+    consent=True,
+    use_case="research",
+    jurisdiction="CA-US",
+)
+result = session.analyze(
+    response_text="...",
+    audio_path="response.wav",
+)
+```
 
 ## CLI (Implemented Now)
 
@@ -174,11 +192,11 @@ curl -X POST http://localhost:8000/session/{id}/analyze \
 ## CLI (planned — Phase 2)
 
 ```bash
-# Analyze a full interview video
-blitz analyze \
-  --baseline baseline_90s.mp4 \
-  --video interview.mp4 \
-  --questions questions.txt \
+# Analyze text with the current MVP
+blitz analyze-text \
+  --baseline-file baseline.txt \
+  --response-file response.txt \
+  --question "Where were you Tuesday night?" \
   --output report.json
 ```
 

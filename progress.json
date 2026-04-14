@@ -3,7 +3,7 @@
   "updated_at": "2026-04-13",
   "phase": "phase_1_engine_core",
   "status": "in_progress",
-  "summary": "Started implementation with a runnable text-first MVP. Baseline calibration, Bayesian fusion, and a first linguistic analyzer are now working. Video, audio, visual, physiological, and adapter layers remain unbuilt.",
+  "summary": "Started implementation with a runnable MVP. Baseline calibration, Bayesian fusion, linguistic text cues, and WAV-based audio cues are now working. Video, visual, physiological, and adapter layers remain unbuilt.",
   "completed": [
     {
       "id": "package-skeleton",
@@ -39,10 +39,15 @@
       "id": "cli-and-reporting",
       "status": "done",
       "details": "Added blitz CLI support for analyze-text plus stable JSON serialization helpers."
+    },
+    {
+      "id": "audio-modality",
+      "status": "done",
+      "details": "Added modalities/audio/analyzer.py and multimodal session support for WAV-based audio cues."
     }
   ],
   "current_limitations": [
-    "Only the linguistic modality is implemented.",
+    "Only text and WAV audio modalities are implemented.",
     "The global convergence gate still requires 2 modality families, so text-only runs can score high but will not pass the gate.",
     "No FastAPI app or dataset harness exists yet.",
     "Cue extraction is heuristic and dependency-light; it is not benchmarked."
@@ -50,23 +55,23 @@
   "next_recommended_steps": [
     {
       "priority": 1,
-      "task": "Build modalities/audio/",
-      "reason": "Audio is the next practical modality and will allow the convergence gate to become meaningful."
-    },
-    {
-      "priority": 2,
       "task": "Build apps/web-api/",
       "reason": "A local API is the next adapter needed for browser or UI work."
     },
     {
-      "priority": 3,
+      "priority": 2,
       "task": "Expand tests beyond the current text MVP smoke coverage",
       "reason": "There is now a basic regression test, but fusion and calibration need more direct assertions."
     },
     {
+      "priority": 3,
+      "task": "Build visual modality scaffolding",
+      "reason": "Visual analysis is still absent and will matter for multi-family convergence."
+    },
+    {
       "priority": 4,
-      "task": "Add report serialization helpers",
-      "reason": "Needed for stable CLI/API outputs and downstream evaluation."
+      "task": "Refine audio feature extraction and add transcription support",
+      "reason": "The current WAV cues are simple proxies; the next lift is richer speech-derived features."
     }
   ],
   "files_touched": [
@@ -82,6 +87,8 @@
     "core/schemas/__init__.py",
     "docs/QUICKSTART.md",
     "modalities/__init__.py",
+    "modalities/audio/__init__.py",
+    "modalities/audio/analyzer.py",
     "modalities/linguistic/__init__.py",
     "modalities/linguistic/analyzer.py",
     "pyproject.toml",

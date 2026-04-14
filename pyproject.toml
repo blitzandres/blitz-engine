@@ -12,4 +12,4 @@ requires-python = ">=3.10"
 blitz = "blitz_engine.cli:main"
 
 [tool.setuptools]
-packages = ["blitz_engine", "core", "core.calibration", "core.fusion", "core.schemas", "modalities", "modalities.linguistic"]
+packages = ["blitz_engine", "core", "core.calibration", "core.fusion", "core.schemas", "modalities", "modalities.audio", "modalities.linguistic"]

@@ -9,10 +9,11 @@ from typing import Dict, List, Optional
 from core.calibration.baseline import PersonalBaseline
 from core.fusion.bayesian_fusion import DEFAULT_PRIOR, convergence_gate_passed, fuse
 from core.schemas.cue_event import BlitzOutput
+from modalities.audio import AudioAnalyzer
 from modalities.linguistic import LinguisticAnalyzer
 
 
-ALLOWED_MODALITIES = {"linguistic"}
+ALLOWED_MODALITIES = {"linguistic", "audio"}
 
 
 class BlitzEngine:
@@ -35,10 +36,13 @@ class BlitzEngine:
         self.prior = prior
         self.convergence_threshold = convergence_threshold
         self.linguistic = LinguisticAnalyzer() if "linguistic" in self.modalities else None
+        self.audio = AudioAnalyzer() if "audio" in self.modalities else None
 
     def new_session(
         self,
-        baseline_texts: List[str],
+        *,
+        baseline_texts: Optional[List[str]] = None,
+        baseline_audio_files: Optional[List[str]] = None,
         consent: bool,
         use_case: str,
         jurisdiction: str,
@@ -48,21 +52,29 @@ class BlitzEngine:
         if not consent:
             raise ValueError("Consent must be declared to create a session.")
 
-        if not baseline_texts:
-            raise ValueError("baseline_texts cannot be empty")
+        if not baseline_texts and not baseline_audio_files:
+            raise ValueError("Provide baseline_texts or baseline_audio_files")
 
         baseline = PersonalBaseline()
         observations: Dict[str, List[float]] = {}
         if self.linguistic:
+            if not baseline_texts:
+                raise ValueError("baseline_texts is required when linguistic modality is enabled")
             observations.update(
                 self.linguistic.build_baseline_observations(
                     baseline_texts=baseline_texts,
                     baseline_latencies_ms=baseline_latencies_ms,
                 )
             )
+        if self.audio:
+            if not baseline_audio_files:
+                raise ValueError("baseline_audio_files is required when audio modality is enabled")
+            observations.update(self.audio.build_baseline_observations(baseline_audio_files))
 
         if baseline_duration_s is None:
-            baseline_duration_s = max(90.0, float(len(baseline_texts) * 30))
+            text_duration = float(len(baseline_texts) * 30) if baseline_texts else 0.0
+            audio_duration = float(len(baseline_audio_files) * 20) if baseline_audio_files else 0.0
+            baseline_duration_s = max(90.0, text_duration + audio_duration)
 
         baseline.record_baseline(observations, duration_s=baseline_duration_s)
         return BlitzSession(
@@ -100,30 +112,70 @@ class BlitzSession:
         question_id: Optional[str] = None,
         response_latency_ms: Optional[int] = None,
     ) -> BlitzOutput:
-        if not response_text.strip():
-            raise ValueError("response_text cannot be empty")
+        return self.analyze(
+            response_text=response_text,
+            question=question,
+            question_id=question_id,
+            response_latency_ms=response_latency_ms,
+        )
+
+    def analyze_audio(
+        self,
+        audio_path: str,
+        question: Optional[str] = None,
+        question_id: Optional[str] = None,
+    ) -> BlitzOutput:
+        return self.analyze(
+            audio_path=audio_path,
+            question=question,
+            question_id=question_id,
+        )
+
+    def analyze(
+        self,
+        response_text: Optional[str] = None,
+        audio_path: Optional[str] = None,
+        question: Optional[str] = None,
+        question_id: Optional[str] = None,
+        response_latency_ms: Optional[int] = None,
+    ) -> BlitzOutput:
+        if not response_text and not audio_path:
+            raise ValueError("Provide response_text or audio_path")
 
         self.question_counter += 1
         resolved_question_id = question_id or f"q{self.question_counter}"
+        timestamp_ms = int(time.time() * 1000)
         cues = []
-        if self.engine.linguistic:
+
+        if response_text is not None:
+            if not response_text.strip():
+                raise ValueError("response_text cannot be empty")
+            if self.engine.linguistic:
+                cues.extend(
+                    self.engine.linguistic.analyze(
+                        text=response_text,
+                        question_id=resolved_question_id,
+                        baseline=self.baseline,
+                        response_latency_ms=response_latency_ms,
+                        timestamp_ms=timestamp_ms,
+                    )
+                )
+
+        if audio_path is not None:
+            if self.engine.audio is None:
+                raise ValueError("Audio modality is not enabled for this session")
             cues.extend(
-                self.engine.linguistic.analyze(
-                    text=response_text,
+                self.engine.audio.analyze(
+                    wav_path=audio_path,
                     question_id=resolved_question_id,
                     baseline=self.baseline,
-                    response_latency_ms=response_latency_ms,
-                    timestamp_ms=int(time.time() * 1000),
+                    timestamp_ms=timestamp_ms,
                 )
             )
 
         fused = fuse(cues, prior=self.engine.prior)
         posterior = fused["posterior"]
-        gate_passed = convergence_gate_passed(
-            cues,
-            threshold=self.engine.convergence_threshold,
-            posterior=posterior,
-        )
+        gate_passed = convergence_gate_passed(cues, threshold=self.engine.convergence_threshold, posterior=posterior)
         narrative = self._build_narrative(
             question=question,
             response_text=response_text,
@@ -135,14 +187,14 @@ class BlitzSession:
         quality_flags = {
             "baseline": self.baseline.quality_report(),
             "implemented_modalities": self.engine.modalities,
-            "input_mode": "text",
+            "input_mode": "multimodal" if response_text and audio_path else "text" if response_text else "audio",
             "convergence_gate_passed": gate_passed,
         }
 
         return BlitzOutput(
             session_id=self.session_id,
             question_id=resolved_question_id,
-            timestamp_ms=int(time.time() * 1000),
+            timestamp_ms=timestamp_ms,
             risk_score=posterior,
             uncertainty=fused["uncertainty"],
             confidence_interval=fused["confidence_interval"],
@@ -157,10 +209,6 @@ class BlitzSession:
                 "jurisdiction": self.jurisdiction,
             },
         )
-
-    def analyze(self, *args, **kwargs) -> BlitzOutput:
-        """Alias retained for the current MVP surface."""
-        return self.analyze_text(*args, **kwargs)
 
     def _build_narrative(
         self,

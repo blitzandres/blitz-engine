@@ -2,7 +2,7 @@
 
 > The open-source behavioral deception detection core.
 
-Blitz Engine is a modular, research-driven engine that analyzes video to detect behavioral deception signals. It combines 66 cues across visual, audio, linguistic, physiological, and cognitive analysis — fused using a Bayesian log-odds architecture with personal baseline calibration.
+Blitz Engine is a modular, research-driven engine that analyzes text and WAV audio to detect behavioral deception signals. It combines 66 cues across visual, audio, linguistic, physiological, and cognitive analysis — fused using a Bayesian log-odds architecture with personal baseline calibration.
 
 **Not a lie detector. A behavioral signal analyzer.**
 
@@ -43,17 +43,17 @@ All planning artifacts consolidated in [`planning/`](planning/) folder:
 
 ## Current Build Status
 
-The repository now includes a runnable **text-first MVP**:
+The repository now includes a runnable **text + WAV audio MVP**:
 
 - `blitz_engine/engine.py` provides `BlitzEngine` and `BlitzSession`
 - `modalities/linguistic/analyzer.py` emits the first linguistic `CueEvent`s
+- `modalities/audio/analyzer.py` emits WAV-based audio `CueEvent`s
 - `core/calibration/baseline.py` performs per-cue robust baseline normalization
 - `core/fusion/bayesian_fusion.py` computes posterior probability and cue ranking
 
 What is still not implemented:
 
 - video ingestion
-- audio extraction
 - visual cues
 - physiological / rPPG cues
 - REST API adapter
@@ -102,6 +102,8 @@ result = session.analyze_text(
 print(result.risk_score)
 print(result.narrative)
 ```
+
+The engine also supports a WAV-based audio modality from Python via `BlitzSession.analyze(...)`. The CLI still targets the text-first workflow.
 
 ---
 
