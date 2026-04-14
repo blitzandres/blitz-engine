@@ -1,13 +1,13 @@
 # Blitz Engine — Quick Start
 
-> Status: Pre-implementation. This guide describes the planned API.
+> Status: text-first MVP implemented. Video/audio APIs below are still planned.
 
 ---
 
-## Installation (planned — Phase 1)
+## Installation
 
 ```bash
-pip install blitz-engine
+pip install -e .
 ```
 
 ## Requirements
@@ -19,42 +19,56 @@ pip install blitz-engine
 
 ---
 
-## Basic Usage
+## Basic Usage (Implemented Now)
 
 ```python
 from blitz_engine import BlitzEngine
 
-# Initialize with the modalities you want active
+# Current MVP supports linguistic cues only.
 engine = BlitzEngine(
-    modalities=["visual", "audio", "linguistic"],
-    prior=0.30,                   # 30% base rate of deceptive responses
-    convergence_threshold=0.65    # minimum posterior to raise flag
+    modalities=["linguistic"],
+    prior=0.30,
+    convergence_threshold=0.65
 )
 
-# Start a session — requires baseline footage
+# Start a session with baseline text samples
 session = engine.new_session(
-    baseline_video="baseline_90s.mp4",   # 90-180s of neutral speech
-    consent=True,                         # you must declare consent was obtained
-    use_case="research",                  # research | education | journalism | personal
+    baseline_texts=[
+        "I drove to work and grabbed coffee before the meeting.",
+        "My usual breakfast is eggs, toast, and tea at home.",
+        "Last weekend I cleaned the apartment and watched a movie.",
+        "I usually walk to the store in the afternoon for groceries.",
+        "My morning routine starts with stretching and checking messages.",
+    ],
+    baseline_duration_s=120,
+    consent=True,
+    use_case="research",
     jurisdiction="CA-US"
 )
 
 # Check baseline quality
 print(session.baseline.quality_report())
-# {"duration_s": 120, "is_sufficient": True, ...}
+# {"duration_s": 120.0, "is_sufficient": True, ...}
 
-# Analyze a response clip
-result = session.analyze(
-    video_clip="response1.mp4",
+# Analyze a response text
+result = session.analyze_text(
+    response_text="Honestly, I really do not know, um, I was basically with someone at that place.",
     question="Where were you on Tuesday night?"
 )
 
-print(result.risk_score)              # 0.72
-print(result.uncertainty)            # 0.15  → 90% CI: [0.57, 0.87]
-print(result.channel_contributions)  # {"visual": 0.68, "audio": 0.81, ...}
-print(result.narrative)              # "At 14.2s, VOT shortening + jaw tension..."
-print(result.compliance["not_for_sole_decision"])  # True (always)
+print(result.risk_score)
+print(result.uncertainty)
+print(result.channel_contributions)
+print(result.narrative)
+print(result.compliance["not_for_sole_decision"])
 ```
+
+## Planned Next
+
+- audio cue extraction from files
+- visual cue extraction from frames
+- multi-modal convergence that can actually satisfy the 2-family gate
+- CLI and local API adapters
 
 ---
 

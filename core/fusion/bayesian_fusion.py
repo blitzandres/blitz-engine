@@ -1,23 +1,8 @@
-"""
-Blitz Engine — Bayesian Log-Odds Fusion
-The mathematical core of the deception scoring system.
+"""Bayesian log-odds fusion for normalized cue streams."""
 
-Theory:
-    logit(P(lie|cues)) = logit(P_0) + Σ_i [w_i × LLR_i]
-    LLR_i ≈ d_i × z_i - (d_i² / 2)  [equal-variance Gaussian assumption]
-
-With average d=0.25 and k independent cues:
-    d_total ≈ 0.25 × √k
-
-References:
-    - DePaulo et al. (2003) — average effect size d≈0.25 across 158 cues
-    - Bogaard et al. (2024) — baselining methodology
-    - Zuckerman et al. (1981) — leakage hierarchy
-
-Status: PLACEHOLDER — implementation pending Phase 1 build authorization.
-"""
 import math
-from typing import List
+from typing import Dict, List
+
 from core.schemas.cue_event import CueEvent, BlitzOutput
 
 # Default prior: 30% base rate of deceptive responses (conservative)
@@ -67,17 +52,60 @@ def compute_llr(cue: CueEvent) -> float:
     return d * z - (d ** 2 / 2)
 
 
-def fuse(cues: List[CueEvent], prior: float = DEFAULT_PRIOR) -> dict:
-    """
-    Bayesian log-odds accumulation across all cues.
+def cue_weight(cue: CueEvent) -> float:
+    """Combine extraction quality, temporal phase, and literature tier."""
+    phase_weight = PHASE_MULTIPLIERS.get(cue.phase.value, 1.0)
+    tier_weight = TIER_WEIGHTS.get(cue.reliability_tier, 0.5)
+    return max(0.0, cue.quality) * phase_weight * tier_weight
 
-    Returns posterior probability and per-channel contributions.
-    Implementation pending Phase 1 build authorization.
-    """
-    raise NotImplementedError(
-        "Blitz Engine fusion not yet implemented. "
-        "This is a placeholder awaiting Phase 1 build authorization."
+
+def group_penalty(cue: CueEvent) -> float:
+    """Down-weight correlated cues that belong to the same evidence family."""
+    for members in CORRELATION_GROUPS.values():
+        if cue.cue_id in members:
+            return 0.7
+    return 1.0
+
+
+def estimate_uncertainty(cues: List[CueEvent]) -> float:
+    """Return a simple 90% CI half-width proxy from cue count and quality."""
+    if not cues:
+        return 0.45
+
+    quality_sum = sum(max(cue.quality, 0.05) for cue in cues)
+    active = max(1.0, quality_sum)
+    return min(0.45, max(0.08, 0.32 / math.sqrt(active)))
+
+
+def fuse(cues: List[CueEvent], prior: float = DEFAULT_PRIOR) -> dict:
+    """Fuse cues into a posterior probability and explanation payload."""
+    posterior_log_odds = logit(prior)
+    channel_contributions: Dict[str, float] = {}
+    scored_cues: List[CueEvent] = []
+
+    for cue in cues:
+        cue.llr = compute_llr(cue)
+        contribution = cue.llr * cue_weight(cue) * group_penalty(cue)
+        posterior_log_odds += contribution
+        channel_contributions.setdefault(cue.modality.value, 0.0)
+        channel_contributions[cue.modality.value] += contribution
+        scored_cues.append(cue)
+
+    posterior = sigmoid(posterior_log_odds)
+    uncertainty = estimate_uncertainty(scored_cues)
+    confidence_interval = (
+        max(0.0, posterior - uncertainty),
+        min(1.0, posterior + uncertainty),
     )
+
+    return {
+        "posterior": posterior,
+        "posterior_log_odds": posterior_log_odds,
+        "channel_contributions": channel_contributions,
+        "top_cues": sorted(scored_cues, key=lambda cue: abs(cue.llr), reverse=True)[:5],
+        "uncertainty": uncertainty,
+        "confidence_interval": confidence_interval,
+    }
 
 
 def convergence_gate_passed(cues: List[CueEvent], threshold: float = 0.65,

@@ -41,6 +41,59 @@ All planning artifacts consolidated in [`planning/`](planning/) folder:
 
 **Total:** ~100 KB planning documentation. Ready for Phase 1 implementation sequencing.
 
+## Current Build Status
+
+The repository now includes a runnable **text-first MVP**:
+
+- `blitz_engine/engine.py` provides `BlitzEngine` and `BlitzSession`
+- `modalities/linguistic/analyzer.py` emits the first linguistic `CueEvent`s
+- `core/calibration/baseline.py` performs per-cue robust baseline normalization
+- `core/fusion/bayesian_fusion.py` computes posterior probability and cue ranking
+
+What is still not implemented:
+
+- video ingestion
+- audio extraction
+- visual cues
+- physiological / rPPG cues
+- REST API / CLI adapters
+
+Install locally from the repo root:
+
+```bash
+pip install -e .
+```
+
+Minimal text-only example:
+
+```python
+from blitz_engine import BlitzEngine
+
+engine = BlitzEngine(modalities=["linguistic"])
+session = engine.new_session(
+    baseline_texts=[
+        "I drove to work and grabbed coffee before the meeting.",
+        "My usual breakfast is eggs, toast, and tea at home.",
+        "Last weekend I cleaned the apartment and watched a movie.",
+        "I usually walk to the store in the afternoon for groceries.",
+        "My morning routine starts with stretching and checking messages.",
+    ],
+    consent=True,
+    use_case="research",
+    jurisdiction="CA-US",
+    baseline_duration_s=120,
+)
+
+result = session.analyze_text(
+    response_text="Honestly, I really do not know, um, I was basically with someone at that place.",
+    question="Where were you Tuesday night?",
+    response_latency_ms=900,
+)
+
+print(result.risk_score)
+print(result.narrative)
+```
+
 ---
 
 ## Accuracy (Honest)
